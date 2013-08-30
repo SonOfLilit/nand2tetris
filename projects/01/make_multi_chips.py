@@ -45,19 +45,23 @@ class Gate(object):
 
     @property
     def inputs_code(self):
-        return self.header("IN", self.all_inputs(str(self.size)))
+        return self.header("IN", self.all_inputs(str(self.size), is_header=True))
 
     @property
     def outputs_code(self):
         return self.header("OUT", self.all_outputs(str(self.size)))
 
-    def all_inputs(self, index_string):
-        return self.indexed(self.wide_inputs, index_string) + self.indexed(self.single_inputs)
+    def all_inputs(self, index_string, is_header=False):
+        return self.indexed(self.wide_inputs, index_string) + self.indexed(self.single_inputs, None, is_header)
 
     def all_outputs(self, index_string):
         return self.indexed(self.outputs, index_string)
 
-    def indexed(self, items, index_string=None):
+    def indexed(self, items, index_string=None, is_header=False):
+        # to allow vectors that are left untouched
+        if not is_header and items and "[" in items[0]:
+            items = [item[:item.find("[")] for item in items]
+
         if index_string is None:
             index_string = ""
         else:
@@ -86,7 +90,8 @@ def write_chip(gate):
 
 GATES = [Gate("And", SIZE, ["a", "b"], [], ["out"]),
          Gate("Or", SIZE, ["a", "b"], [], ["out"]),
-         Gate("Mux", SIZE, ["a", "b"], ["sel"], ["out"])]
+         Gate("Mux", SIZE, ["a", "b"], ["sel"], ["out"]),
+         Gate("Mux4Way", SIZE, ["a", "b", "c", "d"], ["sel[2]"], ["out"])]
 
 if __name__ == '__main__':
     for gate in GATES:
