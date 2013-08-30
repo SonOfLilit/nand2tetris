@@ -1,18 +1,18 @@
 // This file is part of www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
-// File name: projects/01/Or8Way.hdl
+// File name: projects/01/Or4Way.hdl
 
 /**
- * 8-way or gate: out = in[0] or in[1] or ... or in[7].
+ * 4-way or gate: out = in[0] or in[1] or ... or in[3].
  */
 
-CHIP Or8Way {
-    IN in[8];
+CHIP Or4Way {
+    IN in[4];
     OUT out;
 
     PARTS:
-    Or4Way(in=in[0..3], out=a);
-    Or4Way(in=in[4..7], out=b);
+    Or(a=in[0], b=in[1], out=a);
+    Or(a=in[2], b=in[3], out=b);
     Or(a=a, b=b, out=out);
 }
