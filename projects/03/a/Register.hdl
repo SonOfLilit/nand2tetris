@@ -14,5 +14,5 @@ CHIP Register {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    Bit16(in=in, load=load, out=out);
 }

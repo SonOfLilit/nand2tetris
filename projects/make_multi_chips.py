@@ -96,7 +96,8 @@ GATES = {"01": [Gate("And", SIZE, ["a", "b"], [], ["out"]),
                 Gate("Mux", SIZE, ["a", "b"], ["sel"], ["out"]),
                 Gate("Mux4Way", SIZE, ["a", "b", "c", "d"], ["sel[2]"], ["out"]),
                 Gate("Mux8Way", SIZE, list(string.letters[:8]), ["sel[3]"], ["out"])],
-         "02": [Gate("Buffer", SIZE, ["in"], [], ["out"])]}
+         "02": [Gate("Buffer", SIZE, ["in"], [], ["out"])],
+         "03/a": [Gate("Bit", SIZE, ["in"], ["load"], ["out"])]}
 
 if __name__ == '__main__':
     for dirname, gates in GATES.iteritems():
