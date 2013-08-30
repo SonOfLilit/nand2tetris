@@ -1,0 +1,9 @@
+CHIP ChooseInput16 {
+    IN in[16], z, n;
+    OUT out[16];
+
+    PARTS:
+    Not16(in=in, out=notIn);
+    Join(a1=n, a0=z, out=sel);
+    Mux4Way16(a=in, b=false, c=notIn, d=true, sel=sel, out=out);
+}

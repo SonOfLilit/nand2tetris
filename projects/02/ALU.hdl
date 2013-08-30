@@ -45,5 +45,11 @@ CHIP ALU {
         ng; // 1 if (out<0),  0 otherwise
 
     PARTS:
-   // Put you code here:
+    ChooseInput16(in=x, z=zx, n=nx, out=znx);
+    ChooseInput16(in=y, z=zy, n=ny, out=zny);
+    AndAdd16(x=znx, y=zny, f=f, out=beforeNegate);
+    MaybeNegate16(in=beforeNegate, negate=no, out=result);
+    Buffer16(in=result, out=out);
+    IsZero16Way(in=result, out=zr);
+    IsNegative16Way(in=result, out=ng);
 }

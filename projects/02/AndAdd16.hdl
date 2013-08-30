@@ -1,0 +1,8 @@
+CHIP AndAdd16 {
+    IN x[16], y[16], f;
+    OUT out[16];
+    PARTS:
+    Add16(a=x, b=y, out=add);
+    And16(a=x, b=y, out=and);
+    Mux16(a=and, b=add, sel=f, out=out);
+}

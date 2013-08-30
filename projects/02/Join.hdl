@@ -1,0 +1,7 @@
+CHIP Join {
+    IN a1, a0;
+    OUT out[2];
+    PARTS:
+    Buffer(in=a1, out=out[1]);
+    Buffer(in=a0, out=out[0]);
+}

@@ -1,0 +1,7 @@
+CHIP MaybeNegate16 {
+    IN in[16], negate;
+    OUT out[16];
+    PARTS:
+    Not16(in=in, out=negated);
+    Mux16(a=in, b=negated, sel=negate, out=out);
+}
