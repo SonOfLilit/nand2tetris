@@ -13,5 +13,5 @@ CHIP Add16 {
     OUT out[16];
 
     PARTS:
-   // Put you code here:
+    Add16WithCarry(a=a, b=b, c=false, sum=out, carry=ignore);
 }
