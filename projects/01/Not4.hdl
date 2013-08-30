@@ -1,0 +1,14 @@
+/**
+ * 4-bit Not gate: for i=0..3: out[i] = not in[i]
+ */
+
+CHIP Not4 {
+    IN in[4];
+    OUT out[4];
+
+    PARTS:
+    Not(in=in[0], out=out[0]);
+    Not(in=in[1], out=out[1]);
+    Not(in=in[2], out=out[2]);
+    Not(in=in[3], out=out[3]);
+}
