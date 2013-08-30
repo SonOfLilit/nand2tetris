@@ -1,3 +1,5 @@
+import string
+
 SIZE = 16
 FILENAME = "%(name)s.hdl"
 NEWLINE = "\n"
@@ -91,7 +93,8 @@ def write_chip(gate):
 GATES = [Gate("And", SIZE, ["a", "b"], [], ["out"]),
          Gate("Or", SIZE, ["a", "b"], [], ["out"]),
          Gate("Mux", SIZE, ["a", "b"], ["sel"], ["out"]),
-         Gate("Mux4Way", SIZE, ["a", "b", "c", "d"], ["sel[2]"], ["out"])]
+         Gate("Mux4Way", SIZE, ["a", "b", "c", "d"], ["sel[2]"], ["out"]),
+         Gate("Mux8Way", SIZE, list(string.letters[:8]), ["sel[3]"], ["out"])]
 
 if __name__ == '__main__':
     for gate in GATES:
