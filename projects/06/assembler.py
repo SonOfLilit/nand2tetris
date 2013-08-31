@@ -1,7 +1,41 @@
 import re
 
+COMPS = {
+    "0":   "0101010",
+    "1":   "0111111",
+    "-1":  "0111010",
+    "D":   "0001100",
+    "A":   "0110000",
+    "!D":  "0001101",
+    "!A":  "0110001",
+    "-D":  "0001111",
+    "-A":  "0110011",
+    "D+1": "0011111",
+    "A+1": "0011011",
+    "D-1": "0001110",
+    "A+1": "0110010",
+    # TODO: More
+}
+for key, value in COMPS.items():
+    if "A" in key:
+        COMPS[key.replace("A", "M")] = "1" + value[1:]
+
+JUMPS = {
+    None:  "000",
+    "JGT": "001",
+    "JEQ": "010",
+    "JGE": "011",
+    "JLT": "100",
+    "JNE": "101",
+    "JLE": "110",
+    "JMP": "111",
+}
+comps = "|".join(re.escape(comp) for comp in COMPS)
+jumps = "|".join(filter(lambda x: x, JUMPS))
 SYMBOL_RE = re.compile("^[a-zA-Z_.$:][a-zA-Z0-9_.$:]*$")
-CINSTRUCTION_RE = re.compile("^(?:(A?M?D?)=|)(0|1|-1)(?:|;(JMP))$")
+CINSTRUCTION_RE = re.compile("^(?:(A?M?D?)=|)(%s)(?:|;(%s))$" % (comps, jumps))
+del comps
+del jumps
 
 
 class SyntaxError(Exception):
@@ -78,6 +112,10 @@ def parser(text):
     [Label('NAM.E')]
     >>> list(parser("0;JMP"))
     [CInstruction(None, '0', 'JMP')]
+    >>> list(parser("A=A+1"))
+    [CInstruction('A', 'A+1', None)]
+    >>> list(parser("0;JNE"))
+    [CInstruction(None, '0', 'JNE')]
     >>> list(parser("0;jmp"))
     Traceback (most recent call last):
     ...
@@ -99,6 +137,7 @@ def parser(text):
             yield Label(line[1:-1])
         else:
             yield CInstruction.parse(line)
+
 
 if __name__ == '__main__':
     import doctest
