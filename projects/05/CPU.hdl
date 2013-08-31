@@ -39,5 +39,41 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // Big parts
+
+    ALU(x=d, y=am,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9], ny=instruction[8],
+        f=instruction[7], no=instruction[6],
+        out=outALU, zr=zr, ng=ng);
+    // if reset, pc=0
+    // else, if there should be a jump, pc=a
+    // else, pc=pc+1
+    // luckily, this is the exact order that PC looks at its inputs
+    PC(in=a, load=jump, reset=reset, inc=true, out[0..14]=pc);
+    ARegister(in=inA, load=loadA, out=a);
+    DRegister(in=outALU, load=loadD, out=d);
+
+    // Instruction Decoding
+
+    // Most instruction decoding can happen where needed, but side
+    // effects from ALU calculations should only happen on a C instruction
+    And(a=instruction[15], b=instruction[5], out=loadAFromALU);
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // PC
+    Jump(isC=instruction[15], jumpBits=instruction[0..2], zr=zr, ng=ng, out=jump);
+
+    // A
+    Not(in=instruction[15], out=isA);
+    Or(a=isA, b=loadAFromALU, out=loadA);
+    Mux16(a=outALU, b=instruction, sel=isA, out=inA);
+
+    // M
+    Buffer16(in=outALU, out=outM);
+    Buffer16(in=a, out[0..14]=addressM);
+
+    // Y input into ALU is either A or M
+    Mux16(a=a, b=inM, sel=instruction[12], out=am);
 }

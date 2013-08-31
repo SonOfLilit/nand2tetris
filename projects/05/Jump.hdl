@@ -1,0 +1,13 @@
+CHIP Jump {
+    IN isC, jumpBits[3], zr, ng;
+    OUT out;
+    PARTS:
+    Or(a=zr, b=ng, out=lte);
+    Not(in=lte, out=gt);
+    And(a=jumpBits[2], b=ng, out=jumpBecauseLT);
+    And(a=jumpBits[1], b=zr, out=jumpBecauseEQ);
+    And(a=jumpBits[0], b=gt, out=jumpBecauseGT);
+    Or(a=jumpBecauseLT, b=jumpBecauseGT, out=jumpBecauseLTGT);
+    Or(a=jumpBecauseLTGT, b=jumpBecauseEQ, out=jump);
+    And(a=jump, b=isC, out=out);
+}
