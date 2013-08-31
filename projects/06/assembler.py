@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 """
 An assembler for nand2tetris machine language.
 
@@ -68,7 +69,9 @@ Author: Aur Saraf
     1110101010000111
 """
 
+import os
 import re
+import sys
 
 NEWLINE = "\n"
 
@@ -336,6 +339,29 @@ def code(commands):
     return NEWLINE.join(command.code() for command in commands if command.is_instruction())
 
 
+def main(args):
+    if len(args) != 1:
+        print_usage()
+        return -1
+    path, = args
+    if not path.endswith(".asm"):
+        print usage
+        return -1
+    if not os.path.exists(path):
+        print "file not found"
+        return 1
+
+    with open(path, "rb") as asmfile:
+        hack = code(parser(asmfile.read()))
+    with open(path[:-4] + ".hack", "wb") as hackfile:
+        hackfile.write(hack)
+    return 0
+
+def print_usage():
+        print "usage: assembler.py path/to/file.asm"
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+
+    sys.exit(main(sys.argv[1:]))
