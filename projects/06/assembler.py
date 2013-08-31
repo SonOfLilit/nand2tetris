@@ -86,7 +86,7 @@ COMPS = {
     "-D":  "001111",
     "-A":  "110011",
     "D+1": "011111",
-    "A+1": "011011",
+    "A+1": "110111",
     "D-1": "001110",
     "A-1": "110010",
     "D+A": "000010",
@@ -130,7 +130,7 @@ del jumps
 BUILTIN_SYMBOLS = {"SCREEN": 0x4000, "KBD": 0x6000}
 for i, name in enumerate("SP LCL ARG THIS THAT".split()):
     BUILTIN_SYMBOLS[name] = i
-for i in xrange(15):
+for i in xrange(16):
     BUILTIN_SYMBOLS["R" + str(i)] = i
 del i
 del name
@@ -297,6 +297,8 @@ def code(commands):
     '0011001100110011\\n0101010101010101'
     >>> code([CInstruction(None, '0', 'JMP')])
     '1110101010000111'
+    >>> code([CInstruction("AM", "M+1", None)])
+    '1111110111101000'
     >>> code([Label('HI')])
     ''
     >>> code([SymbolLiteral("i")])
@@ -307,6 +309,8 @@ def code(commands):
     '0000000000000000'
     >>> code([SymbolLiteral("R10")])
     '0000000000001010'
+    >>> code([SymbolLiteral("R15")])
+    '0000000000001111'
     >>> code([Label("i"), SymbolLiteral("i")])
     '0000000000000000'
     >>> code([Label("i"), Label("i")])
