@@ -1,5 +1,7 @@
 import re
 
+NEWLINE = "\n"
+
 COMPS = {
     "0":   "101010",
     "1":   "111111",
@@ -58,6 +60,9 @@ class NumericLiteral(Literal):
         if not (0 <= value < 2 ** 16):
             raise SyntaxError("Literal out of range: %d" % value)
         self.value = value
+
+    def code(self):
+        return "{0:016b}".format(self.value)
 
 class SymbolLiteral(Literal):
     def __init__(self, value):
@@ -186,7 +191,14 @@ def parser(text):
 
 def code(commands):
     """
+    >>> code([])
+    ''
+    >>> code([NumericLiteral(0x3333)])
+    '0011001100110011'
+    >>> code([NumericLiteral(0x3333), NumericLiteral(0x5555)])
+    '0011001100110011\\n0101010101010101'
     """
+    return NEWLINE.join(command.code() for command in commands)
 
 
 if __name__ == '__main__':
