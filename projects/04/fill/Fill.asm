@@ -8,7 +8,7 @@
 // i.e. writes "black" in every pixel. When no key is pressed, the
 // program clears the screen, i.e. writes "white" in every pixel.
 
-@BLANK_LOOP
+@BLANK_WAIT
 0;JMP
 
 (BLANK)
