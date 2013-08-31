@@ -1,3 +1,78 @@
+"""
+An assembler for nand2tetris machine language.
+
+Author: Aur Saraf
+
+    >>> print code(parser('''// Some comments
+    ... @sum
+    ... M=0
+    ... 
+    ... @R0
+    ... D=M
+    ... @counter
+    ... M=D
+    ... 
+    ... (LOOP)
+    ... @counter
+    ... D=M
+    ... @END // More comments
+    ... D;JLE
+    ... // Sometimes on a line of their own
+    ... @sum
+    ... D=M
+    ... @R1
+    ... D=D+M
+    ... @sum
+    ... M=D
+    ... 
+    ... @counter
+    ... M=M-1
+    ... 
+    ... @LOOP
+    ... 0;JMP
+    ... 
+    ... (END)
+    ... @sum
+    ... D=M
+    ... @R2
+    ... M=D
+    ... 
+    ... (HALT)
+    ... @HALT
+    ... 0;JMP'''))
+    Traceback (most recent call last):
+    ...
+    AttributeError: 'SymbolLiteral' object has no attribute 'code'
+
+
+    0000000000010000
+    1110101010001000
+    0000000000000000
+    1111110000010000
+    0000000000010001
+    1110001100001000
+    0000000000010001
+    1111110000010000
+    0000000000010100
+    1110001100000110
+    0000000000010000
+    1111110000010000
+    0000000000000001
+    1111000010010000
+    0000000000010000
+    1110001100001000
+    0000000000010001
+    1111110010001000
+    0000000000000110
+    1110101010000111
+    0000000000010000
+    1111110000010000
+    0000000000000010
+    1110001100001000
+    0000000000011000
+    1110101010000111
+"""
+
 import re
 
 NEWLINE = "\n"
@@ -59,6 +134,9 @@ class SyntaxError(Exception):
     pass
 
 class Command(object):
+    def is_instruction(self):
+        return True
+
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.value)
 
@@ -85,6 +163,9 @@ class Label(Command):
         if not SYMBOL_RE.match(value):
             raise SyntaxError("Invalid symbol: %s" % value)
         self.value = value
+
+    def is_instruction(self):
+        return False
 
 class CInstruction(Command):
     def __init__(self, dest, comp, jump):
@@ -146,7 +227,6 @@ def parser(text):
     ...
     SyntaxError: Invalid line: 0;jmp
     >>> len(list(parser('''@sum
-    ... @sum
     ... M=0
     ... 
     ... @R0
@@ -182,7 +262,7 @@ def parser(text):
     ... (HALT)
     ... @HALT
     ... 0;JMP''')))
-    30
+    29
     """
     for line in text.splitlines():
         if "//" in line:
@@ -212,8 +292,10 @@ def code(commands):
     '0011001100110011\\n0101010101010101'
     >>> code([CInstruction(None, '0', 'JMP')])
     '1110101010000111'
+    >>> code([Label('HI')])
+    ''
     """
-    return NEWLINE.join(command.code() for command in commands)
+    return NEWLINE.join(command.code() for command in commands if command.is_instruction())
 
 
 if __name__ == '__main__':
