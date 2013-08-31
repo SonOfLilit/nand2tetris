@@ -148,7 +148,8 @@ GATES = {"01": [Gate("And", WIDTH, ["a", "b"], [], ["out"]),
          "02": [Gate("Buffer", WIDTH, ["in"], [], ["out"])],
          "03/a": [Gate("Bit", WIDTH, ["in"], ["load"], ["out"]),
                   Ram(WIDTH, 6, 3)],
-        "03/b": [Ram(WIDTH, 9, 6), Ram(WIDTH, 12, 9), Ram(WIDTH, 14, 12)]}
+         "03/b": [Ram(WIDTH, 9, 6), Ram(WIDTH, 12, 9), Ram(WIDTH, 14, 12)]}
+
 if __name__ == '__main__':
     for dirname, gates in GATES.iteritems():
         for gate in gates:
