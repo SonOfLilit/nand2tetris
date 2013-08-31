@@ -1,6 +1,7 @@
 import re
 
-SYMBOL_RE = re.compile("[a-zA-Z_.$:][a-zA-Z0-9_.$:]*")
+SYMBOL_RE = re.compile("^[a-zA-Z_.$:][a-zA-Z0-9_.$:]*$")
+CINSTRUCTION_RE = re.compile("^(?:(A?M?D?)=|)(0|1|-1)(?:|;(JMP))$")
 
 
 class SyntaxError(Exception):
@@ -30,6 +31,23 @@ class Label(Command):
         if not SYMBOL_RE.match(value):
             raise SyntaxError("Invalid symbol: %s" % value)
         self.value = value
+
+class CInstruction(Command):
+    def __init__(self, dest, comp, jmp):
+        self.dest = dest
+        self.comp = comp
+        self.jmp = jmp
+
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (self.__class__.__name__, self.dest, self.comp, self.jmp)
+
+    @classmethod
+    def parse(cls, line):
+        match = CINSTRUCTION_RE.match(line)
+        if not match:
+            raise SyntaxError("Invalid line: " + line)
+        dest, comp, jmp = match.groups()
+        return cls(dest, comp, jmp)
 
 
 def parser(text):
@@ -61,9 +79,9 @@ def parser(text):
     >>> list(parser("0;JMP"))
     [CInstruction(None, '0', 'JMP')]
     >>> list(parser("0;jmp"))
-    Traceback:
+    Traceback (most recent call last):
     ...
-    SyntaxError
+    SyntaxError: Invalid line: 0;jmp
     """
     for line in text.splitlines():
         if "//" in line:
@@ -80,7 +98,7 @@ def parser(text):
         elif line.startswith("(") and line.endswith(")"):
             yield Label(line[1:-1])
         else:
-            raise SyntaxError("Invalid line: " + line)
+            yield CInstruction.parse(line)
 
 if __name__ == '__main__':
     import doctest
