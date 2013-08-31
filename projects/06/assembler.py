@@ -40,11 +40,6 @@ Author: Aur Saraf
     ... (HALT)
     ... @HALT
     ... 0;JMP'''))
-    Traceback (most recent call last):
-    ...
-    AttributeError: 'SymbolLiteral' object has no attribute 'code'
-
-
     0000000000010000
     1110101010001000
     0000000000000000
@@ -129,6 +124,13 @@ C_INSTRUCTION_RE = re.compile("^(?:(A?M?D?)=|)(%s)(?:|;(%s))$" % (comps, jumps))
 del comps
 del jumps
 
+BUILTIN_SYMBOLS = {"SCREEN": 0x4000, "KBD": 0x6000}
+for i, name in enumerate("SP LCL ARG THIS THAT".split()):
+    BUILTIN_SYMBOLS[name] = i
+for i in xrange(15):
+    BUILTIN_SYMBOLS["R" + str(i)] = i
+del i
+del name
 
 class SyntaxError(Exception):
     pass
@@ -294,7 +296,43 @@ def code(commands):
     '1110101010000111'
     >>> code([Label('HI')])
     ''
+    >>> code([SymbolLiteral("i")])
+    '0000000000010000'
+    >>> code([SymbolLiteral("i"), SymbolLiteral("J"), SymbolLiteral("i")])
+    '0000000000010000\\n0000000000010001\\n0000000000010000'
+    >>> code([SymbolLiteral("R0")])
+    '0000000000000000'
+    >>> code([SymbolLiteral("R10")])
+    '0000000000001010'
+    >>> code([Label("i"), SymbolLiteral("i")])
+    '0000000000000000'
+    >>> code([Label("i"), Label("i")])
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Label redefined: i
+    >>> code([SymbolLiteral("i"), Label("i")])
+    '0000000000000001'
     """
+    commands = list(commands)
+
+    symbols = dict(BUILTIN_SYMBOLS)
+    counter = 0
+    for i, command in enumerate(commands):
+        if command.is_instruction():
+            counter += 1
+        if isinstance(command, Label):
+            if command.value in symbols:
+                raise SyntaxError("Label redefined: %s" % command.value)
+            symbols[command.value] = counter
+
+    first_free_variable = 16
+    for i, command in enumerate(commands):
+        if isinstance(command, SymbolLiteral):
+            if command.value not in symbols:
+                symbols[command.value] = first_free_variable
+                first_free_variable += 1
+            commands[i] = NumericLiteral(symbols[command.value])
+
     return NEWLINE.join(command.code() for command in commands if command.is_instruction())
 
 
