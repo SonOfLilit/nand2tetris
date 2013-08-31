@@ -6,9 +6,12 @@ SYMBOL_RE = re.compile("[a-zA-Z_.$:][a-zA-Z0-9_.$:]*")
 class SyntaxError(Exception):
     pass
 
-class Literal(object):
+class Command(object):
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self.value)
+
+class Literal(Command):
+    pass
 
 class NumericLiteral(Literal):
     def __init__(self, value):
@@ -21,6 +24,13 @@ class SymbolLiteral(Literal):
         if not SYMBOL_RE.match(value):
             raise SyntaxError("Invalid symbol: %s" % value)
         self.value = value
+
+class Label(Command):
+    def __init__(self, value):
+        if not SYMBOL_RE.match(value):
+            raise SyntaxError("Invalid symbol: %s" % value)
+        self.value = value
+
 
 def parser(text):
     """
@@ -46,6 +56,8 @@ def parser(text):
     [SymbolLiteral('a'), SymbolLiteral('a')]
     >>> list(parser("@a\\n@b //@c"))
     [SymbolLiteral('a'), SymbolLiteral('b')]
+    >>> list(parser("(NAM.E)"))
+    [Label('NAM.E')]
     >>> list(parser("0;JMP"))
     [CInstruction(None, '0', 'JMP')]
     >>> list(parser("0;jmp"))
@@ -65,6 +77,8 @@ def parser(text):
                 yield NumericLiteral(int(literal))
             else:
                 yield SymbolLiteral(literal)
+        elif line.startswith("(") and line.endswith(")"):
+            yield Label(line[1:-1])
         else:
             raise SyntaxError("Invalid line: " + line)
 
