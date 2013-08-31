@@ -27,6 +27,16 @@ for key, value in COMPS.items():
     if "A" in key:
         COMPS[key.replace("A", "M")] = "1" + value
 
+DESTS = {
+    None: "000",
+    "M": "001",
+    "D": "010",
+    "MD": "011",
+    "A": "100",
+    "MA": "101",
+    "DA": "110",
+    "MDA": "111",
+}
 JUMPS = {
     None:  "000",
     "JGT": "001",
@@ -77,13 +87,16 @@ class Label(Command):
         self.value = value
 
 class CInstruction(Command):
-    def __init__(self, dest, comp, jmp):
+    def __init__(self, dest, comp, jump):
         self.dest = dest
         self.comp = comp
-        self.jmp = jmp
+        self.jump = jump
+
+    def code(self):
+        return "111" + COMPS[self.comp] + DESTS[self.dest] + JUMPS[self.jump]
 
     def __repr__(self):
-        return "%s(%r, %r, %r)" % (self.__class__.__name__, self.dest, self.comp, self.jmp)
+        return "%s(%r, %r, %r)" % (self.__class__.__name__, self.dest, self.comp, self.jump)
 
     @classmethod
     def parse(cls, line):
@@ -197,6 +210,8 @@ def code(commands):
     '0011001100110011'
     >>> code([NumericLiteral(0x3333), NumericLiteral(0x5555)])
     '0011001100110011\\n0101010101010101'
+    >>> code([CInstruction(None, '0', 'JMP')])
+    '1110101010000111'
     """
     return NEWLINE.join(command.code() for command in commands)
 
