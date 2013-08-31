@@ -1,8 +1,18 @@
+class Literal(object):
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.value)
+
+class NumericLiteral(Literal):
+    def __init__(self, value):
+        self.value = value
+
 def parser(text):
     """
     >>> list(parser(""))
     []
     >>> list(parser("@0"))
+    [NumericLiteral(0)]
+    >>> list(parser(" @0"))
     [NumericLiteral(0)]
     >>> list(parser("@a"))
     [SymbolLiteral("a")]
@@ -17,7 +27,10 @@ def parser(text):
     ...
     SyntaxError
     """
-    return []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("@"):
+            yield NumericLiteral(int(line[1:]))
 
 if __name__ == '__main__':
     import doctest
