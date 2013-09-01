@@ -42,6 +42,18 @@ def parser(text):
     []
     >>> list(parser('push constant 0 // haha'))
     [PushConstant(0)]
+    >>> list(parser('push constant struggle'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Not a number: struggle
+    >>> list(parser('push me away'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Not a recognized segment: me
+    >>> list(parser('push me'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Invalid push command: ['push', 'me']
     '''
     for line in text.splitlines():
         if "//" in line:
@@ -49,9 +61,16 @@ def parser(text):
         line = line.strip().split()
         if line == []:
             pass
-        elif len(line) == 3 and line[:2] == ["push", "constant"]:
-            yield PushConstant(int(line[2]))
-    return
+        elif line[0] == "push":
+            if len(line) != 3:
+                raise SyntaxError("Invalid push command: %s" % line)
+            _, segment, param = line
+            if segment == "constant":
+                if not param.isdigit():
+                    raise SyntaxError("Not a number: %s" % param)
+                yield PushConstant(int(param))
+            else:
+                raise SyntaxError("Not a recognized segment: %s" % segment)
 
 
 if __name__ == '__main__':
