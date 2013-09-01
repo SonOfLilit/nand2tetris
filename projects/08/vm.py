@@ -13,6 +13,7 @@ from StringIO import StringIO
 
 NEWLINE = '\n'
 SYMBOL_RE = re.compile('^[a-zA-Z_.$:][a-zA-Z0-9_.$:]*$')
+MAX_LOCALS = 1024
 
 
 class SyntaxError(Exception):
@@ -368,6 +369,19 @@ BRANCHING_COMMANDS = {
     'if-goto': IfGoto,
 }
 
+
+class Function(Command):
+    def __init__(self, name, num_locals):
+        self.name = name
+        self.num_locals = num_locals
+
+    def __str__(self):
+        return 'function %s %d' % (self.name, self.num_locals)
+
+    def __repr__(self):
+        return 'Function(%r, %d)' % (self.name, self.num_locals)
+
+
 def parser(text):
     '''
     >>> list(parser(''))
@@ -426,6 +440,20 @@ def parser(text):
     [Goto('hello')]
     >>> list(parser('if-goto hello'))
     [IfGoto('hello')]
+    >>> list(parser('function mult 1'))
+    [Function('mult', 1)]
+    >>> list(parser('function mult 1 2'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Function command should have 2 parameters: ['function', 'mult', '1', '2']
+    >>> list(parser('function 5 2'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Invalid symbol name: 5
+    >>> list(parser('function prod 1025'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Function cannot have 1025 locals
     '''
     for line in text.splitlines():
         if '//' in line:
@@ -448,6 +476,14 @@ def parser(text):
             operation, name = line
             check_symbol_name(name)
             yield BRANCHING_COMMANDS[operation](name)
+        elif line[0] == 'function':
+            check_parameters(line, 2, 'Function')
+            _, name, num_locals = line
+            check_symbol_name(name)
+            num_locals = parse_number(num_locals)
+            if not 0 <= num_locals <= MAX_LOCALS:
+                raise SyntaxError('Function cannot have %d locals' % num_locals)
+            yield Function(name, num_locals)
         else:
             raise SyntaxError('Not a recognized command: %s' % line[0])
 
