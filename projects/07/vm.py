@@ -52,33 +52,31 @@ class Push(Command):
 
 
 class Segment(object):
+    PUSH_D = '''\
+@SP
+AM=M+1
+A=A-1
+M=D'''
+
     def __init__(self, name, push_code):
         self.name = name
         self.push_code = push_code
 
     def push_asm(self, push):
-        return self.push_code % push.parameter
+        return (self.push_code % push.parameter) + NEWLINE + self.PUSH_D
 
     def __repr__(self):
         return self.name.upper()
 
 
 PUSH_CONSTANT = '''@%d
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D'''
+D=A'''
 
 PUSH_LOCAL = '''@LOCAL
 D=M
 @%d
 A=D+A
-D=M
-@SP
-AM=M+1
-A=A-1
-M=D'''
+D=M'''
 
 
 CONSTANT = Segment('constant', PUSH_CONSTANT)
