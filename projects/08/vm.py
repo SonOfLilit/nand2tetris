@@ -10,10 +10,12 @@
 # TODO: compile directory
 
 import os
+import re
 import sys
 from StringIO import StringIO
 
 NEWLINE = '\n'
+SYMBOL_RE = re.compile('^[a-zA-Z_.$:][a-zA-Z0-9_.$:]*$')
 
 
 class SyntaxError(Exception):
@@ -324,6 +326,14 @@ ARITHMETIC_COMMANDS = {
 }
 
 
+class Label(Command):
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "%s('%s')" % (self.__class__.__name__, self.name)
+
+
 def parser(text):
     '''
     >>> list(parser(''))
@@ -351,7 +361,7 @@ def parser(text):
     >>> list(parser('push me'))
     Traceback (most recent call last):
     ...
-    SyntaxError: Invalid stack command: ['push', 'me']
+    SyntaxError: Stack command should have 2 parameters: ['push', 'me']
     >>> list(parser('push static 5'))
     [Push(STATIC, 5)]
     >>> list(parser('push static dynamic'))
@@ -367,7 +377,17 @@ def parser(text):
     >>> list(parser('add 5'))
     Traceback (most recent call last):
     ...
-    SyntaxError: Arithmetic command has no arguments: ['add', '5']
+    SyntaxError: Arithmetic command should have 0 parameters: ['add', '5']
+    >>> list(parser('label hello'))
+    [Label('hello')]
+    >>> list(parser('label'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Label command should have 1 parameters: ['label']
+    >>> list(parser('label 5'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Invalid symbol name: 5
     '''
     for line in text.splitlines():
         if '//' in line:
@@ -376,20 +396,30 @@ def parser(text):
         if line == []:
             pass
         elif line[0] in STACK_OPERATIONS:
-            if len(line) != 3:
-                raise SyntaxError('Invalid stack command: %s' % line)
+            check_parameters(line, 2, 'Stack')
             operation, segment, param = line
             if segment in SEGMENTS:
                 yield STACK_OPERATIONS[operation](SEGMENTS[segment], parse_number(param))
             else:
                 raise SyntaxError('Not a recognized segment: %s' % segment)
         elif line[0] in ARITHMETIC_COMMANDS:
-            if len(line) != 1:
-                raise SyntaxError('Arithmetic command has no arguments: %s' % line)
+            check_parameters(line, 0, 'Arithmetic')
             yield ARITHMETIC_COMMANDS[line[0]]()
+        elif line[0] == 'label':
+            check_parameters(line, 1, 'Label')
+            _, name = line
+            check_symbol_name(name)
+            yield Label(name)
         else:
             raise SyntaxError('Not a recognized command: %s' % line[0])
 
+def check_parameters(line, expected_number, name):
+    if len(line) != expected_number + 1:
+        raise SyntaxError('%s command should have %d parameters: %s' % (name, expected_number, line))
+
+def check_symbol_name(name):
+   if not SYMBOL_RE.match(name):
+       raise SyntaxError('Invalid symbol name: %s' % name)
 
 def parse_number(s):
     if not s.isdigit():
