@@ -95,24 +95,48 @@ class ArithmeticCommand(Command):
         return '%s()' % (self.__class__.__name__)
 
 
-class Add(ArithmeticCommand):
-    def asm_code(self):
-        code = \
-'''@SP
+BINARY_OP_HEADER = '''@SP
 A=M
 D=M
 @SP
-AM=M-1
-M=D+M'''
-        return code
+AM=M-1'''
+
+ADD_CODE = '''%s
+M=D+M''' % BINARY_OP_HEADER
+SUB_CODE = '''%s
+M=M-D''' % BINARY_OP_HEADER
+
+class Add(ArithmeticCommand):
+    def asm_code(self):
+        return ADD_CODE
 
 
 class Sub(ArithmeticCommand):
-    pass
+    def asm_code(self):
+        return SUB_CODE
 
+
+EQUALITY_CHECK = BINARY_OP_HEADER + '''
+D=D-M
+@EQUAL%(unique_identifier)d
+D;JEQ
+D=%(equal_result)d
+@WRITE%(unique_identifier)d
+0;JMP
+(EQUAL%(unique_identifier)d)
+D=%(nonequal_result)d
+(WRITE%(unique_identifier)d)
+@SP
+A=M
+M=D'''
 
 class Eq(ArithmeticCommand):
-    pass
+    def asm_code(self):
+        equal_result = 1
+        nonequal_result = 0
+        # TODO
+        unique_identifier = 0
+        return EQUALITY_CHECK % locals()
 
 
 class Neq(ArithmeticCommand):
@@ -243,6 +267,26 @@ def code(commands):
     @SP
     AM=M-1
     M=D+M
+    <BLANKLINE>
+    >>> print code([Eq()])
+    // eq
+    @SP
+    A=M
+    D=M
+    @SP
+    AM=M-1
+    D=D-M
+    @EQUAL0
+    D;JEQ
+    D=1
+    @WRITE0
+    0;JMP
+    (EQUAL0)
+    D=0
+    (WRITE0)
+    @SP
+    A=M
+    M=D
     <BLANKLINE>
     '''
     output = StringIO()
