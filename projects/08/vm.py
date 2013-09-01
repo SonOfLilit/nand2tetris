@@ -1,7 +1,5 @@
 #!/usr/bin/python2
 
-# TODO: goto
-# TODO: if
 # TODO: function
 # TODO: call
 # TODO: return
@@ -325,22 +323,50 @@ ARITHMETIC_COMMANDS = {
 }
 
 
-class Label(Command):
-    # there is no need to take care that no two labels of the same
-    # name exist, since the assembler does that for us
-
+class BranchingCommand(Command):
     def __init__(self, name):
         self.name = name
 
-    def asm_code(self, i):
-        return '(L%s)' % self.name
-
     def __str__(self):
-        return "label %s" % self.name
+        return "%s %s" % (self.command, self.name)
 
     def __repr__(self):
         return "%s('%s')" % (self.__class__.__name__, self.name)
 
+
+class Label(BranchingCommand):
+    # there is no need to take care that no two labels of the same
+    # name exist, since the assembler does that for us
+
+    command = 'label'
+
+    def asm_code(self, i):
+        return '(L%s)' % self.name
+
+
+class Goto(BranchingCommand):
+    command = 'goto'
+
+    def asm_code(self, i):
+        return '''\
+@L%s
+0;JMP''' % self.name
+
+
+class IfGoto(BranchingCommand):
+    command = 'if-goto'
+
+    def asm_code(self, i):
+        return Segment.POP_D + '''
+@L%s
+D;JNE''' % self.name
+
+
+BRANCHING_COMMANDS = {
+    'label': Label,
+    'goto': Goto,
+    'if-goto': IfGoto,
+}
 
 def parser(text):
     '''
@@ -391,11 +417,15 @@ def parser(text):
     >>> list(parser('label'))
     Traceback (most recent call last):
     ...
-    SyntaxError: Label command should have 1 parameters: ['label']
+    SyntaxError: Branching command should have 1 parameters: ['label']
     >>> list(parser('label 5'))
     Traceback (most recent call last):
     ...
     SyntaxError: Invalid symbol name: 5
+    >>> list(parser('goto hello'))
+    [Goto('hello')]
+    >>> list(parser('if-goto hello'))
+    [IfGoto('hello')]
     '''
     for line in text.splitlines():
         if '//' in line:
@@ -413,11 +443,11 @@ def parser(text):
         elif line[0] in ARITHMETIC_COMMANDS:
             check_parameters(line, 0, 'Arithmetic')
             yield ARITHMETIC_COMMANDS[line[0]]()
-        elif line[0] == 'label':
-            check_parameters(line, 1, 'Label')
-            _, name = line
+        elif line[0] in BRANCHING_COMMANDS:
+            check_parameters(line, 1, 'Branching')
+            operation, name = line
             check_symbol_name(name)
-            yield Label(name)
+            yield BRANCHING_COMMANDS[operation](name)
         else:
             raise SyntaxError('Not a recognized command: %s' % line[0])
 
@@ -536,6 +566,19 @@ def code(commands):
     >>> print code([Label('hello')])
     // label hello
     (Lhello)
+    <BLANKLINE>
+    >>> print code([Goto('hello')])
+    // goto hello
+    @Lhello
+    0;JMP
+    <BLANKLINE>
+    >>> print code([IfGoto('hello')])
+    // if-goto hello
+    @SP
+    AM=M-1
+    D=M
+    @Lhello
+    D;JNE
     <BLANKLINE>
     '''
     output = StringIO()
