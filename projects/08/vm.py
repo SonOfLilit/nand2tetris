@@ -1,5 +1,14 @@
 #!/usr/bin/python2
 
+# TODO: label
+# TODO: goto
+# TODO: if
+# TODO: function
+# TODO: call
+# TODO: return
+# TODO: initialization
+# TODO: compile directory
+
 import os
 import sys
 from StringIO import StringIO
