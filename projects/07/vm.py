@@ -34,12 +34,10 @@ class Push(Command):
         return '%s(%r)' % (self.__class__.__name__, self.value)
 
     def __str__(self):
-        return 'push %s %s' % (self.segment, self.value)
+        return 'push %s %s' % (self.__class__.__name__.lower()[4:], self.value)
 
 
 class PushConstant(Push):
-    segment = 'constant'
-
     def asm_code(self):
         code = \
 '''@%d
@@ -51,31 +49,30 @@ M=D''' % self.value
 
 
 class PushStatic(Push):
-    segment = 'static'
-
+    pass
 
 class PushLocal(Push):
-    segment = 'local'
+    pass
 
 
 class PushArgument(Push):
-    segment = 'argument'
+    pass
 
 
 class PushThis(Push):
-    segment = 'this'
+    pass
 
 
 class PushThat(Push):
-    segment = 'that'
+    pass
 
 
 class PushPointer(Push):
-    segment = 'pointer'
+    pass
 
 
 class PushTemp(Push):
-    segment = 'temp'
+    pass
 
 
 PUSH_BY_SEGMENT = {
@@ -91,12 +88,23 @@ PUSH_BY_SEGMENT = {
 
 
 class ArithmeticCommand(Command):
+    def __str__(self):
+        return self.__class__.__name__.lower()
+
     def __repr__(self):
         return '%s()' % (self.__class__.__name__)
 
 
 class Add(ArithmeticCommand):
-    pass
+    def asm_code(self):
+        code = \
+'''@SP
+A=M
+D=M
+@SP
+AM=M-1
+M=D+M'''
+        return code
 
 
 class Sub(ArithmeticCommand):
@@ -226,6 +234,15 @@ def code(commands):
     @SP
     AM=A+1
     M=D
+    <BLANKLINE>
+    >>> print code([Add()])
+    // add
+    @SP
+    A=M
+    D=M
+    @SP
+    AM=M-1
+    M=D+M
     <BLANKLINE>
     '''
     output = StringIO()
