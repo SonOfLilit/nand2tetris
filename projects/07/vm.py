@@ -1,5 +1,7 @@
 #!/usr/bin/python2
 
+import os
+import sys
 from StringIO import StringIO
 
 NEWLINE = '\n'
@@ -10,8 +12,14 @@ class SyntaxError(Exception):
 
 
 class Command(object):
-    def asm(self):
-        return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(), NEWLINE)
+    def asm(self, i):
+        '''
+        Returns hack assembly code for this command.
+
+        i is a unique number, useful to distinguish labels for
+        different commands.
+        '''
+        return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(i), NEWLINE)
 
 
 class Push(Command):
@@ -38,12 +46,13 @@ class Push(Command):
 
 
 class PushConstant(Push):
-    def asm_code(self):
+    def asm_code(self, i):
         code = \
 '''@%d
 D=A
 @SP
-AM=A+1
+AM=M+1
+A=A-1
 M=D''' % self.value
         return code
 
@@ -96,10 +105,9 @@ class ArithmeticCommand(Command):
 
 
 BINARY_OP_HEADER = '''@SP
-A=M
+AM=M-1
 D=M
-@SP
-AM=M-1'''
+A=A-1'''
 
 ADD_CODE = '''%s
 M=D+M''' % BINARY_OP_HEADER
@@ -107,12 +115,12 @@ SUB_CODE = '''%s
 M=M-D''' % BINARY_OP_HEADER
 
 class Add(ArithmeticCommand):
-    def asm_code(self):
+    def asm_code(self, i):
         return ADD_CODE
 
 
 class Sub(ArithmeticCommand):
-    def asm_code(self):
+    def asm_code(self, i):
         return SUB_CODE
 
 
@@ -127,20 +135,23 @@ D=%(equal_result)d
 D=%(nonequal_result)d
 (WRITE%(unique_identifier)d)
 @SP
-A=M
+A=M-1
 M=D'''
 
 class Eq(ArithmeticCommand):
-    def asm_code(self):
+    def asm_code(self, i):
         equal_result = 1
         nonequal_result = 0
-        # TODO
-        unique_identifier = 0
+        unique_identifier = i
         return EQUALITY_CHECK % locals()
 
 
 class Neq(ArithmeticCommand):
-    pass
+    def asm_code(self, i):
+        equal_result = 0
+        nonequal_result = 1
+        unique_identifier = i
+        return EQUALITY_CHECK % locals()
 
 
 class Gt(ArithmeticCommand):
@@ -256,25 +267,24 @@ def code(commands):
     @5
     D=A
     @SP
-    AM=A+1
+    AM=M+1
+    A=A-1
     M=D
     <BLANKLINE>
     >>> print code([Add()])
     // add
     @SP
-    A=M
-    D=M
-    @SP
     AM=M-1
+    D=M
+    A=A-1
     M=D+M
     <BLANKLINE>
     >>> print code([Eq()])
     // eq
     @SP
-    A=M
-    D=M
-    @SP
     AM=M-1
+    D=M
+    A=A-1
     D=D-M
     @EQUAL0
     D;JEQ
@@ -285,17 +295,40 @@ def code(commands):
     D=0
     (WRITE0)
     @SP
-    A=M
+    A=M-1
     M=D
     <BLANKLINE>
     '''
     output = StringIO()
-    for command in commands:
-        output.write(command.asm())
+    for i, command in enumerate(commands):
+        output.write(command.asm(i))
 
     return output.getvalue()
 
 
+def main(args):
+    if len(args) != 1:
+        print_usage()
+        return -1
+    path, = args
+    if not path.endswith(".vm"):
+        print usage
+        return -1
+    if not os.path.exists(path):
+        print "file not found"
+        return 1
+
+    with open(path, "rb") as vmfile:
+        hack = code(parser(vmfile.read()))
+    with open(path[:-3] + ".asm", "wb") as asmfile:
+        asmfile.write(hack)
+    return 0
+
+def print_usage():
+        print "usage: vm.py path/to/file.vm"
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
+
+    sys.exit(main(sys.argv[1:]))
