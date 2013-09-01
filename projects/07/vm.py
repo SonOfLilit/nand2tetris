@@ -138,20 +138,20 @@ D=%(nonequal_result)d
 A=M-1
 M=D'''
 
-class Eq(ArithmeticCommand):
+class Equality(ArithmeticCommand):
     def asm_code(self, i):
-        equal_result = 1
-        nonequal_result = 0
+        equal_result = self.EQUAL_RESULT
+        nonequal_result = self.NONEQUAL_RESULT
         unique_identifier = i
         return EQUALITY_CHECK % locals()
 
+class Eq(Equality):
+    EQUAL_RESULT = 1
+    NONEQUAL_RESULT = 0
 
-class Neq(ArithmeticCommand):
-    def asm_code(self, i):
-        equal_result = 0
-        nonequal_result = 1
-        unique_identifier = i
-        return EQUALITY_CHECK % locals()
+class Neq(Equality):
+    EQUAL_RESULT = 0
+    NONEQUAL_RESULT = 1
 
 
 class Gt(ArithmeticCommand):
