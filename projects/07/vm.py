@@ -6,8 +6,7 @@ class SyntaxError(Exception):
 
 
 class Command(object):
-    def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.value)
+    pass
 
 
 class Push(Command):
@@ -25,6 +24,9 @@ class Push(Command):
         if not 0 <= value < 2 ** 15:
             raise SyntaxError("Number out of range: %d" % value)
         self.value = value
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__.__name__, self.value)
 
 
 class PushConstant(Push):
@@ -70,6 +72,61 @@ PUSH_BY_SEGMENT = {
     'temp': PushTemp,
 }
 
+
+class ArithmeticCommand(Command):
+    def __repr__(self):
+        return "%s()" % (self.__class__.__name__)
+
+
+class Add(ArithmeticCommand):
+    pass
+
+
+class Sub(ArithmeticCommand):
+    pass
+
+
+class Eq(ArithmeticCommand):
+    pass
+
+
+class Neq(ArithmeticCommand):
+    pass
+
+
+class Gt(ArithmeticCommand):
+    pass
+
+
+class Lt(ArithmeticCommand):
+    pass
+
+
+class And(ArithmeticCommand):
+    pass
+
+
+class Or(ArithmeticCommand):
+    pass
+
+
+class Not(ArithmeticCommand):
+    pass
+
+
+ARITHMETIC_COMMANDS = {
+    'add': Add,
+    'sub': Sub,
+    'eq': Eq,
+    'neq': Neq,
+    'gt': Gt,
+    'lt': Lt,
+    'and': And,
+    'or': Or,
+    'not': Not
+}
+
+
 def parser(text):
     '''
     >>> list(parser(''))
@@ -106,6 +163,14 @@ def parser(text):
     SyntaxError: Not a number: dynamic
     >>> list(parser('push local 0\\npush argument 0\\npush this 0\\npush that 1\\npush pointer 2\\npush temp 3\\n'))
     [PushLocal(0), PushArgument(0), PushThis(0), PushThat(1), PushPointer(2), PushTemp(3)]
+    >>> list(parser('add'))
+    [Add()]
+    >>> list(parser('sub\\neq\\nneq\\ngt\\nlt\\nand\\nor\\nnot'))
+    [Sub(), Eq(), Neq(), Gt(), Lt(), And(), Or(), Not()]
+    >>> list(parser('add 5'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Arithmetic command has no arguments: ['add', '5']
     '''
     for line in text.splitlines():
         if "//" in line:
@@ -121,6 +186,10 @@ def parser(text):
                 yield PUSH_BY_SEGMENT[segment](parse_number(param))
             else:
                 raise SyntaxError("Not a recognized segment: %s" % segment)
+        elif line[0] in ARITHMETIC_COMMANDS:
+            if len(line) != 1:
+                raise SyntaxError("Arithmetic command has no arguments: %s" % line)
+            yield ARITHMETIC_COMMANDS[line[0]]()
         else:
             raise SyntaxError("Not a recognized command: %s" % line[0])
 
