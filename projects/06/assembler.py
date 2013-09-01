@@ -349,7 +349,7 @@ def main(args):
         return -1
     path, = args
     if not path.endswith(".asm"):
-        print usage
+        print_usage()
         return -1
     if not os.path.exists(path):
         print "file not found"

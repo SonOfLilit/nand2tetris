@@ -82,7 +82,7 @@ M=D
 
 // find local 2
 @LOCAL
-D=A
+D=M
 @2
 D=D+A
 // save it to R13

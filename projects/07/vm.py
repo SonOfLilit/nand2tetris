@@ -22,7 +22,7 @@ class Command(object):
         return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(i), NEWLINE)
 
 
-class Push(Command):
+class StackOperation(Command):
     '''
     >>> Push(CONSTANT, 0)
     Push(CONSTANT, 0)
@@ -33,22 +33,36 @@ class Push(Command):
     ...
     SyntaxError: Parameter out of range: 32768
     '''
-    MAX_PARAMETER_VALUE = 0x7FFF
+    max_parameter_value = 0x7FFF
 
-    def __init__(self, segment, parameter):
-        if not 0 <= parameter <= self.MAX_PARAMETER_VALUE:
+    def __init__(self, segment, parameter, program='f'):
+        if not 0 <= parameter <= self.max_parameter_value:
             raise SyntaxError('Parameter out of range: %d' % parameter)
         self.segment = segment
         self.parameter = parameter
-
-    def asm_code(self, i):
-        return self.segment.push_asm(self)
+        self.program = program
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.segment, self.parameter)
 
     def __str__(self):
-        return 'push %s %s' % (self.segment.name, self.parameter)
+        return '%s %s %s' % (self.__class__.__name__.lower(), self.segment.name, self.parameter)
+
+
+class Push(StackOperation):
+    def asm_code(self, i):
+        return self.segment.push_asm(self)
+
+
+class Pop(StackOperation):
+    def asm_code(self, i):
+        return self.segment.pop_asm(self)
+
+
+STACK_OPERATIONS = {
+    'push': Push,
+    'pop': Pop,
+}
 
 
 class Segment(object):
@@ -58,35 +72,124 @@ AM=M+1
 A=A-1
 M=D'''
 
-    def __init__(self, name, push_code):
+    read_to_d = '''\
+@%(segment)s
+D=M
+@%(parameter)d
+A=D+A
+D=M'''
+
+    SAVE_TARGET_TO_R15 = '''\
+@%(segment)s
+D=M
+@%(parameter)d
+D=D+A
+@R15
+M=D'''
+
+    POP_D = '''\
+@SP
+AM=M-1
+D=M'''
+
+    SAVE_D_TO_TARGET_IN_R15 = '''\
+@R15
+A=M
+M=D'''
+
+    pop_asm_code = NEWLINE.join([SAVE_TARGET_TO_R15, POP_D, SAVE_D_TO_TARGET_IN_R15])
+
+    def __init__(self, name, symbol=None):
         self.name = name
-        self.push_code = push_code
+        self.symbol = symbol
 
     def push_asm(self, push):
-        return (self.push_code % push.parameter) + NEWLINE + self.PUSH_D
+        program = push.program
+        segment = self.symbol
+        parameter = push.parameter
+        return (self.read_to_d % locals()) + NEWLINE + self.PUSH_D
+
+    def pop_asm(self, pop):
+        program = pop.program
+        segment = self.symbol
+        parameter = pop.parameter
+        return self.pop_asm_code % locals()
 
     def __repr__(self):
         return self.name.upper()
 
 
-PUSH_CONSTANT = '''@%d
+class ConstantSegment(Segment):
+    '''
+    >>> Pop(CONSTANT, 1).asm(0)
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Cannot pop constant
+    '''
+    read_to_d = '''\
+@%(parameter)d
 D=A'''
 
-PUSH_LOCAL = '''@LOCAL
-D=M
-@%d
-A=D+A
+    def pop_asm(self, pop):
+        raise SyntaxError('Cannot pop constant')
+
+
+class StaticSegment(Segment):
+    read_to_d = '''\
+@%(program)s.%(parameter)d
 D=M'''
 
+    pop_asm_code = NEWLINE.join([Segment.POP_D,
+'''@%(program)s.%(parameter)d
+M=D'''])
 
-CONSTANT = Segment('constant', PUSH_CONSTANT)
-STATIC = Segment('static', None)
-LOCAL = Segment('local', PUSH_LOCAL)
-ARGUMENT = Segment('argument', None)
-THIS = Segment('this', None)
-THAT = Segment('that', None)
-POINTER = Segment('pointer', None)
-TEMP = Segment('temp', None)
+
+class FixedSegment(Segment):
+    '''
+    >>> type(code([Push(POINTER, 1)])) is str
+    True
+    >>> code([Push(POINTER, 2)])
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Out of "pointer" segment's bounds: 2
+    '''
+
+    read_to_d = '''\
+@%(address)d
+D=M'''
+
+    pop_asm_code = NEWLINE.join([Segment.POP_D,
+'''@%(address)d
+M=D'''])
+
+    def __init__(self, name, base, size):
+        super(FixedSegment, self).__init__(name)
+        self.base = base
+        self.size = size
+
+    def check_bounds(self, operation):
+        if operation.parameter >= self.size:
+            raise SyntaxError('Out of "%s" segment\'s bounds: %d' % (self.name, operation.parameter))
+
+    def push_asm(self, push):
+        self.check_bounds(push)
+        address = self.base + push.parameter
+        return (self.read_to_d % locals()) + NEWLINE + self.PUSH_D
+
+    def pop_asm(self, pop):
+        self.check_bounds(pop)
+        address = self.base + pop.parameter
+        return self.pop_asm_code % locals()
+
+
+CONSTANT = ConstantSegment('constant')
+STATIC = StaticSegment('static')
+LOCAL = Segment('local', 'LCL')
+ARGUMENT = Segment('argument', 'ARG')
+THIS = Segment('this', 'THIS')
+THAT = Segment('that', 'THAT')
+POINTER = FixedSegment('pointer', base=3, size=2)
+TEMP = FixedSegment('temp', base=5, size=8)
 SEGMENTS = {
     'constant': CONSTANT,
     'static': STATIC,
@@ -208,7 +311,7 @@ ARITHMETIC_COMMANDS = {
     'lt': Lt,
     'and': And,
     'or': Or,
-    'not': Not
+    'not': Not,
 }
 
 
@@ -239,7 +342,7 @@ def parser(text):
     >>> list(parser('push me'))
     Traceback (most recent call last):
     ...
-    SyntaxError: Invalid push command: ['push', 'me']
+    SyntaxError: Invalid stack command: ['push', 'me']
     >>> list(parser('push static 5'))
     [Push(STATIC, 5)]
     >>> list(parser('push static dynamic'))
@@ -263,12 +366,12 @@ def parser(text):
         line = line.strip().split()
         if line == []:
             pass
-        elif line[0] == 'push':
+        elif line[0] in STACK_OPERATIONS:
             if len(line) != 3:
-                raise SyntaxError('Invalid push command: %s' % line)
-            _, segment, param = line
+                raise SyntaxError('Invalid stack command: %s' % line)
+            operation, segment, param = line
             if segment in SEGMENTS:
-                yield Push(SEGMENTS[segment], parse_number(param))
+                yield STACK_OPERATIONS[operation](SEGMENTS[segment], parse_number(param))
             else:
                 raise SyntaxError('Not a recognized segment: %s' % segment)
         elif line[0] in ARITHMETIC_COMMANDS:
@@ -290,6 +393,22 @@ def code(commands):
     >>> print code([Push(CONSTANT, 5)])
     // push constant 5
     @5
+    D=A
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    <BLANKLINE>
+    >>> print code([Push(CONSTANT, 5), Push(CONSTANT, 4)])
+    // push constant 5
+    @5
+    D=A
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    // push constant 4
+    @4
     D=A
     @SP
     AM=M+1
@@ -323,6 +442,50 @@ def code(commands):
     A=M-1
     M=D
     <BLANKLINE>
+    >>> print code([Push(LOCAL, 5)])
+    // push local 5
+    @LCL
+    D=M
+    @5
+    A=D+A
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    <BLANKLINE>
+    >>> print code([Pop(LOCAL, 5)])
+    // pop local 5
+    @LCL
+    D=M
+    @5
+    D=D+A
+    @R15
+    M=D
+    @SP
+    AM=M-1
+    D=M
+    @R15
+    A=M
+    M=D
+    <BLANKLINE>
+    >>> print code([Push(TEMP, 5)])
+    // push temp 5
+    @10
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    <BLANKLINE>
+    >>> print code([Pop(POINTER, 1)])
+    // pop pointer 1
+    @SP
+    AM=M-1
+    D=M
+    @4
+    M=D
+    <BLANKLINE>
     '''
     output = StringIO()
     for i, command in enumerate(commands):
@@ -337,7 +500,7 @@ def main(args):
         return -1
     path, = args
     if not path.endswith('.vm'):
-        print usage
+        print_usage()
         return -1
     if not os.path.exists(path):
         print 'file not found'
