@@ -113,7 +113,10 @@ ADD_CODE = '''%s
 M=D+M''' % BINARY_OP_HEADER
 SUB_CODE = '''%s
 M=M-D''' % BINARY_OP_HEADER
-
+NEG_CODE = '''@SP
+A=M-1
+M=-M
+'''
 class Add(ArithmeticCommand):
     def asm_code(self, i):
         return ADD_CODE
@@ -124,15 +127,20 @@ class Sub(ArithmeticCommand):
         return SUB_CODE
 
 
+class Neg(ArithmeticCommand):
+    def asm_code(self, i):
+        return NEG_CODE
+
+
 EQUALITY_CHECK = BINARY_OP_HEADER + '''
 D=D-M
 @EQUAL%(unique_identifier)d
-D;JEQ
-D=%(equal_result)d
+D;%(jump)s
+D=0
 @WRITE%(unique_identifier)d
 0;JMP
 (EQUAL%(unique_identifier)d)
-D=%(nonequal_result)d
+D=-1
 (WRITE%(unique_identifier)d)
 @SP
 A=M-1
@@ -140,45 +148,59 @@ M=D'''
 
 class Equality(ArithmeticCommand):
     def asm_code(self, i):
-        equal_result = self.EQUAL_RESULT
-        nonequal_result = self.NONEQUAL_RESULT
+        jump = self.JUMP
         unique_identifier = i
         return EQUALITY_CHECK % locals()
 
 class Eq(Equality):
-    EQUAL_RESULT = 1
-    NONEQUAL_RESULT = 0
+    JUMP = 'JEQ'
 
-class Neq(Equality):
-    EQUAL_RESULT = 0
-    NONEQUAL_RESULT = 1
+class Gt(Equality):
+    # x < y <==> y > x
+    JUMP = 'JLT'
+
+class Lt(Equality):
+    # x < y <==> y > x
+    JUMP = 'JGT'
 
 
-class Gt(ArithmeticCommand):
-    pass
-
-
-class Lt(ArithmeticCommand):
-    pass
-
+# 1111 & 1111 = 1111
+# 1111 & 0000 = 0000
+# 0000 & 1111 = 0000
+# 0000 & 0000 = 0000
+AND_CODE = '''%s
+M=M&D''' % BINARY_OP_HEADER
+# 1111 | 1111 = 1111
+# 1111 | 0000 = 1111
+# 0000 | 1111 = 1111
+# 0000 | 0000 = 0000
+OR_CODE = '''%s
+M=M|D''' % BINARY_OP_HEADER
+NOT_CODE = '''@SP
+A=M-1
+M=!M
+'''
 
 class And(ArithmeticCommand):
-    pass
+    def asm_code(self, i):
+        return AND_CODE
 
 
 class Or(ArithmeticCommand):
-    pass
+    def asm_code(self, i):
+        return OR_CODE
 
 
 class Not(ArithmeticCommand):
-    pass
+    def asm_code(self, i):
+        return NOT_CODE
 
 
 ARITHMETIC_COMMANDS = {
     'add': Add,
     'sub': Sub,
+    'neg': Neg,
     'eq': Eq,
-    'neq': Neq,
     'gt': Gt,
     'lt': Lt,
     'and': And,
@@ -225,8 +247,8 @@ def parser(text):
     [PushLocal(0), PushArgument(0), PushThis(0), PushThat(1), PushPointer(2), PushTemp(3)]
     >>> list(parser('add'))
     [Add()]
-    >>> list(parser('sub\\neq\\nneq\\ngt\\nlt\\nand\\nor\\nnot'))
-    [Sub(), Eq(), Neq(), Gt(), Lt(), And(), Or(), Not()]
+    >>> list(parser('sub\\nneg\\neq\\ngt\\nlt\\nand\\nor\\nnot'))
+    [Sub(), Neg(), Eq(), Gt(), Lt(), And(), Or(), Not()]
     >>> list(parser('add 5'))
     Traceback (most recent call last):
     ...
@@ -288,11 +310,11 @@ def code(commands):
     D=D-M
     @EQUAL0
     D;JEQ
-    D=1
+    D=0
     @WRITE0
     0;JMP
     (EQUAL0)
-    D=0
+    D=-1
     (WRITE0)
     @SP
     A=M-1

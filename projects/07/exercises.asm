@@ -101,7 +101,7 @@ M=D
 
 
 // eq - remove two top values from stack and write to top of stack
-// 1 if they are equal, else 0
+// -1 if they are equal, else 0
 
 // pop top of stack into D
 @SP
@@ -117,7 +117,7 @@ D=0
 @WRITE
 0;JMP
 (EQUAL)
-D=1
+D=-1
 (WRITE)
 // write D to top of stack
 @SP
