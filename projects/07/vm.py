@@ -42,7 +42,7 @@ class Push(Command):
         self.parameter = parameter
 
     def asm_code(self, i):
-        return self.segment.push_code(self)
+        return self.segment.push_asm(self)
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.segment, self.parameter)
@@ -52,11 +52,12 @@ class Push(Command):
 
 
 class Segment(object):
-    def __init__(self, name):
+    def __init__(self, name, push_code):
         self.name = name
+        self.push_code = push_code
 
-    def push_code(self, push):
-        return PUSH_CONSTANT % push.parameter
+    def push_asm(self, push):
+        return self.push_code % push.parameter
 
     def __repr__(self):
         return self.name.upper()
@@ -70,7 +71,9 @@ A=A-1
 M=D'''
 
 PUSH_LOCAL = '''@LOCAL
-A=M
+D=M
+@%d
+A=D+A
 D=M
 @SP
 AM=M+1
@@ -78,14 +81,14 @@ A=A-1
 M=D'''
 
 
-CONSTANT = Segment('constant')
-STATIC = Segment('static')
-LOCAL = Segment('local')
-ARGUMENT = Segment('argument')
-THIS = Segment('this')
-THAT = Segment('that')
-POINTER = Segment('pointer')
-TEMP = Segment('temp')
+CONSTANT = Segment('constant', PUSH_CONSTANT)
+STATIC = Segment('static', None)
+LOCAL = Segment('local', PUSH_LOCAL)
+ARGUMENT = Segment('argument', None)
+THIS = Segment('this', None)
+THAT = Segment('that', None)
+POINTER = Segment('pointer', None)
+TEMP = Segment('temp', None)
 SEGMENTS = {
     'constant': CONSTANT,
     'static': STATIC,
