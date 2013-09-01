@@ -336,21 +336,21 @@ def main(args):
         print_usage()
         return -1
     path, = args
-    if not path.endswith(".vm"):
+    if not path.endswith('.vm'):
         print usage
         return -1
     if not os.path.exists(path):
-        print "file not found"
+        print 'file not found'
         return 1
 
-    with open(path, "rb") as vmfile:
+    with open(path, 'rb') as vmfile:
         hack = code(parser(vmfile.read()))
-    with open(path[:-3] + ".asm", "wb") as asmfile:
+    with open(path[:-3] + '.asm', 'wb') as asmfile:
         asmfile.write(hack)
     return 0
 
 def print_usage():
-        print "usage: vm.py path/to/file.vm"
+        print 'usage: vm.py path/to/file.vm'
 
 if __name__ == '__main__':
     import doctest
