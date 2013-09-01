@@ -10,24 +10,28 @@ class Command(object):
 
 
 class Push(Command):
-    pass
-
-
-class PushConstant(Push):
     '''
-    >>> PushConstant(0)
-    PushConstant(0)
-    >>> PushConstant(0x7FFF).value == 0x7FFF
+    >>> Push(0)
+    Push(0)
+    >>> Push(0x7FFF).value == 0x7FFF
     True
-    >>> PushConstant(0x8000)
+    >>> Push(0x8000)
     Traceback (most recent call last):
     ...
-    SyntaxError: Constant out of range: 32768
+    SyntaxError: Number out of range: 32768
     '''
     def __init__(self, value):
         if not 0 <= value < 2 ** 15:
-            raise SyntaxError("Constant out of range: %d" % value)
+            raise SyntaxError("Number out of range: %d" % value)
         self.value = value
+
+
+class PushConstant(Push):
+    pass
+
+
+class PushStatic(Push):
+    pass
 
 
 def parser(text):
@@ -54,6 +58,12 @@ def parser(text):
     Traceback (most recent call last):
     ...
     SyntaxError: Invalid push command: ['push', 'me']
+    >>> list(parser('push static 5'))
+    [PushStatic(5)]
+    >>> list(parser('push static dynamic'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Not a number: dynamic
     '''
     for line in text.splitlines():
         if "//" in line:
@@ -66,11 +76,17 @@ def parser(text):
                 raise SyntaxError("Invalid push command: %s" % line)
             _, segment, param = line
             if segment == "constant":
-                if not param.isdigit():
-                    raise SyntaxError("Not a number: %s" % param)
-                yield PushConstant(int(param))
+                yield PushConstant(parse_number(param))
+            elif segment == "static":
+                yield PushStatic(parse_number(param))
             else:
                 raise SyntaxError("Not a recognized segment: %s" % segment)
+
+
+def parse_number(s):
+    if not s.isdigit():
+        raise SyntaxError("Not a number: %s" % s)
+    return int(s)
 
 
 if __name__ == '__main__':
