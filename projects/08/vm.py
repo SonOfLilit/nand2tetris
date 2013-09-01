@@ -1,6 +1,5 @@
 #!/usr/bin/python2
 
-# TODO: label
 # TODO: goto
 # TODO: if
 # TODO: function
@@ -327,8 +326,17 @@ ARITHMETIC_COMMANDS = {
 
 
 class Label(Command):
+    # there is no need to take care that no two labels of the same
+    # name exist, since the assembler does that for us
+
     def __init__(self, name):
         self.name = name
+
+    def asm_code(self, i):
+        return '(L%s)' % self.name
+
+    def __str__(self):
+        return "label %s" % self.name
 
     def __repr__(self):
         return "%s('%s')" % (self.__class__.__name__, self.name)
@@ -524,6 +532,10 @@ def code(commands):
     D=M
     @4
     M=D
+    <BLANKLINE>
+    >>> print code([Label('hello')])
+    // label hello
+    (Lhello)
     <BLANKLINE>
     '''
     output = StringIO()
