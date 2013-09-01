@@ -24,75 +24,77 @@ class Command(object):
 
 class Push(Command):
     '''
-    >>> Push(0)
-    Push(0)
-    >>> Push(0x7FFF).value == 0x7FFF
+    >>> Push(CONSTANT, 0)
+    Push(CONSTANT, 0)
+    >>> Push(CONSTANT, 0x7FFF).parameter == 0x7FFF
     True
-    >>> Push(0x8000)
+    >>> Push(CONSTANT, 0x8000)
     Traceback (most recent call last):
     ...
-    SyntaxError: Number out of range: 32768
+    SyntaxError: Parameter out of range: 32768
     '''
-    def __init__(self, value):
-        if not 0 <= value < 2 ** 15:
-            raise SyntaxError('Number out of range: %d' % value)
-        self.value = value
+    MAX_PARAMETER_VALUE = 0x7FFF
+
+    def __init__(self, segment, parameter):
+        if not 0 <= parameter <= self.MAX_PARAMETER_VALUE:
+            raise SyntaxError('Parameter out of range: %d' % parameter)
+        self.segment = segment
+        self.parameter = parameter
+
+    def asm_code(self, i):
+        return self.segment.push_code(self)
 
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.value)
+        return '%s(%r, %r)' % (self.__class__.__name__, self.segment, self.parameter)
 
     def __str__(self):
-        return 'push %s %s' % (self.__class__.__name__.lower()[4:], self.value)
+        return 'push %s %s' % (self.segment.name, self.parameter)
 
 
-class PushConstant(Push):
-    def asm_code(self, i):
-        code = \
-'''@%d
+class Segment(object):
+    def __init__(self, name):
+        self.name = name
+
+    def push_code(self, push):
+        return PUSH_CONSTANT % push.parameter
+
+    def __repr__(self):
+        return self.name.upper()
+
+
+PUSH_CONSTANT = '''@%d
 D=A
 @SP
 AM=M+1
 A=A-1
-M=D''' % self.value
-        return code
+M=D'''
+
+PUSH_LOCAL = '''@LOCAL
+A=M
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D'''
 
 
-class PushStatic(Push):
-    pass
-
-class PushLocal(Push):
-    pass
-
-
-class PushArgument(Push):
-    pass
-
-
-class PushThis(Push):
-    pass
-
-
-class PushThat(Push):
-    pass
-
-
-class PushPointer(Push):
-    pass
-
-
-class PushTemp(Push):
-    pass
-
-
-PUSH_BY_SEGMENT = {
-    'constant': PushConstant,
-    'static': PushStatic,
-    'local': PushLocal,
-    'argument': PushArgument,
-    'this': PushThis,
-    'that': PushThat,
-    'pointer': PushPointer,
-    'temp': PushTemp,
+CONSTANT = Segment('constant')
+STATIC = Segment('static')
+LOCAL = Segment('local')
+ARGUMENT = Segment('argument')
+THIS = Segment('this')
+THAT = Segment('that')
+POINTER = Segment('pointer')
+TEMP = Segment('temp')
+SEGMENTS = {
+    'constant': CONSTANT,
+    'static': STATIC,
+    'local': LOCAL,
+    'argument': ARGUMENT,
+    'this': THIS,
+    'that': THAT,
+    'pointer': POINTER,
+    'temp': TEMP,
 }
 
 
@@ -214,13 +216,13 @@ def parser(text):
     >>> list(parser(''))
     []
     >>> list(parser('push constant 0'))
-    [PushConstant(0)]
+    [Push(CONSTANT, 0)]
     >>> list(parser('push constant 2\\npush constant 1'))
-    [PushConstant(2), PushConstant(1)]
+    [Push(CONSTANT, 2), Push(CONSTANT, 1)]
     >>> list(parser('// haha\\n  // haha'))
     []
     >>> list(parser('push constant 0 // haha'))
-    [PushConstant(0)]
+    [Push(CONSTANT, 0)]
     >>> list(parser('mwaaaah'))
     Traceback (most recent call last):
     ...
@@ -238,13 +240,13 @@ def parser(text):
     ...
     SyntaxError: Invalid push command: ['push', 'me']
     >>> list(parser('push static 5'))
-    [PushStatic(5)]
+    [Push(STATIC, 5)]
     >>> list(parser('push static dynamic'))
     Traceback (most recent call last):
     ...
     SyntaxError: Not a number: dynamic
     >>> list(parser('push local 0\\npush argument 0\\npush this 0\\npush that 1\\npush pointer 2\\npush temp 3\\n'))
-    [PushLocal(0), PushArgument(0), PushThis(0), PushThat(1), PushPointer(2), PushTemp(3)]
+    [Push(LOCAL, 0), Push(ARGUMENT, 0), Push(THIS, 0), Push(THAT, 1), Push(POINTER, 2), Push(TEMP, 3)]
     >>> list(parser('add'))
     [Add()]
     >>> list(parser('sub\\nneg\\neq\\ngt\\nlt\\nand\\nor\\nnot'))
@@ -264,8 +266,8 @@ def parser(text):
             if len(line) != 3:
                 raise SyntaxError('Invalid push command: %s' % line)
             _, segment, param = line
-            if segment in PUSH_BY_SEGMENT:
-                yield PUSH_BY_SEGMENT[segment](parse_number(param))
+            if segment in SEGMENTS:
+                yield Push(SEGMENTS[segment], parse_number(param))
             else:
                 raise SyntaxError('Not a recognized segment: %s' % segment)
         elif line[0] in ARITHMETIC_COMMANDS:
@@ -284,7 +286,7 @@ def parse_number(s):
 
 def code(commands):
     '''
-    >>> print code([PushConstant(5)])
+    >>> print code([Push(CONSTANT, 5)])
     // push constant 5
     @5
     D=A
