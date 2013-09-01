@@ -1,5 +1,6 @@
 #!/usr/bin/python2
 
+
 class SyntaxError(Exception):
     pass
 
@@ -34,6 +35,41 @@ class PushStatic(Push):
     pass
 
 
+class PushLocal(Push):
+    pass
+
+
+class PushArgument(Push):
+    pass
+
+
+class PushThis(Push):
+    pass
+
+
+class PushThat(Push):
+    pass
+
+
+class PushPointer(Push):
+    pass
+
+
+class PushTemp(Push):
+    pass
+
+
+PUSH_BY_SEGMENT = {
+    'constant': PushConstant,
+    'static': PushStatic,
+    'local': PushLocal,
+    'argument': PushArgument,
+    'this': PushThis,
+    'that': PushThat,
+    'pointer': PushPointer,
+    'temp': PushTemp,
+}
+
 def parser(text):
     '''
     >>> list(parser(''))
@@ -46,6 +82,10 @@ def parser(text):
     []
     >>> list(parser('push constant 0 // haha'))
     [PushConstant(0)]
+    >>> list(parser('mwaaaah'))
+    Traceback (most recent call last):
+    ...
+    SyntaxError: Not a recognized command: mwaaaah
     >>> list(parser('push constant struggle'))
     Traceback (most recent call last):
     ...
@@ -64,6 +104,8 @@ def parser(text):
     Traceback (most recent call last):
     ...
     SyntaxError: Not a number: dynamic
+    >>> list(parser('push local 0\\npush argument 0\\npush this 0\\npush that 1\\npush pointer 2\\npush temp 3\\n'))
+    [PushLocal(0), PushArgument(0), PushThis(0), PushThat(1), PushPointer(2), PushTemp(3)]
     '''
     for line in text.splitlines():
         if "//" in line:
@@ -75,12 +117,12 @@ def parser(text):
             if len(line) != 3:
                 raise SyntaxError("Invalid push command: %s" % line)
             _, segment, param = line
-            if segment == "constant":
-                yield PushConstant(parse_number(param))
-            elif segment == "static":
-                yield PushStatic(parse_number(param))
+            if segment in PUSH_BY_SEGMENT:
+                yield PUSH_BY_SEGMENT[segment](parse_number(param))
             else:
                 raise SyntaxError("Not a recognized segment: %s" % segment)
+        else:
+            raise SyntaxError("Not a recognized command: %s" % line[0])
 
 
 def parse_number(s):
