@@ -22,11 +22,11 @@ class Push(Command):
     '''
     def __init__(self, value):
         if not 0 <= value < 2 ** 15:
-            raise SyntaxError("Number out of range: %d" % value)
+            raise SyntaxError('Number out of range: %d' % value)
         self.value = value
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.value)
+        return '%s(%r)' % (self.__class__.__name__, self.value)
 
 
 class PushConstant(Push):
@@ -75,7 +75,7 @@ PUSH_BY_SEGMENT = {
 
 class ArithmeticCommand(Command):
     def __repr__(self):
-        return "%s()" % (self.__class__.__name__)
+        return '%s()' % (self.__class__.__name__)
 
 
 class Add(ArithmeticCommand):
@@ -173,30 +173,30 @@ def parser(text):
     SyntaxError: Arithmetic command has no arguments: ['add', '5']
     '''
     for line in text.splitlines():
-        if "//" in line:
-            line = line[:line.find("//")]
+        if '//' in line:
+            line = line[:line.find('//')]
         line = line.strip().split()
         if line == []:
             pass
-        elif line[0] == "push":
+        elif line[0] == 'push':
             if len(line) != 3:
-                raise SyntaxError("Invalid push command: %s" % line)
+                raise SyntaxError('Invalid push command: %s' % line)
             _, segment, param = line
             if segment in PUSH_BY_SEGMENT:
                 yield PUSH_BY_SEGMENT[segment](parse_number(param))
             else:
-                raise SyntaxError("Not a recognized segment: %s" % segment)
+                raise SyntaxError('Not a recognized segment: %s' % segment)
         elif line[0] in ARITHMETIC_COMMANDS:
             if len(line) != 1:
-                raise SyntaxError("Arithmetic command has no arguments: %s" % line)
+                raise SyntaxError('Arithmetic command has no arguments: %s' % line)
             yield ARITHMETIC_COMMANDS[line[0]]()
         else:
-            raise SyntaxError("Not a recognized command: %s" % line[0])
+            raise SyntaxError('Not a recognized command: %s' % line[0])
 
 
 def parse_number(s):
     if not s.isdigit():
-        raise SyntaxError("Not a number: %s" % s)
+        raise SyntaxError('Not a number: %s' % s)
     return int(s)
 
 
