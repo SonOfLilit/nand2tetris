@@ -371,9 +371,25 @@ BRANCHING_COMMANDS = {
 
 
 class Function(Command):
+    SAVED_VARS = ['LCL', 'ARG', 'THIS', 'THAT']
+    SAVE_VAR = '''\
+@%s
+D=M
+'''
+    SAVE_VARS = NEWLINE.join([SAVE_VAR % var + Segment.PUSH_D for var in SAVED_VARS])
+    ROOM_FOR_LOCALS = '''
+@%(num_locals)d
+D=A
+@SP
+M=D+M'''
+    FUNCTION_HEADER = SAVE_VARS + ROOM_FOR_LOCALS
+
     def __init__(self, name, num_locals):
         self.name = name
         self.num_locals = num_locals
+
+    def asm_code(self, i):
+        return self.FUNCTION_HEADER % {'num_locals': self.num_locals}
 
     def __str__(self):
         return 'function %s %d' % (self.name, self.num_locals)
@@ -615,6 +631,37 @@ def code(commands):
     D=M
     @Lhello
     D;JNE
+    <BLANKLINE>
+    >>> print code([Function('mult', 5)])
+    // function mult 5
+    @LCL
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @ARG
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @THIS
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @THAT
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @5
+    D=A
+    @SP
+    M=D+M
     <BLANKLINE>
     '''
     output = StringIO()
