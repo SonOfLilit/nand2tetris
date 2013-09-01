@@ -2,10 +2,21 @@
 
 // find top of stack and make room
 @SP
-// make room
 AM=A+1
 // write constant 1
 M=1
+
+
+// alternative that works with all constants
+
+// load constant into D
+@1
+D=A
+// find top of stack and make room
+@SP
+AM=A+1
+// write constant
+M=D
 
 
 // pop static 1

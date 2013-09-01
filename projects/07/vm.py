@@ -1,12 +1,17 @@
 #!/usr/bin/python2
 
+from StringIO import StringIO
+
+NEWLINE = '\n'
+
 
 class SyntaxError(Exception):
     pass
 
 
 class Command(object):
-    pass
+    def asm(self):
+        return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(), NEWLINE)
 
 
 class Push(Command):
@@ -28,37 +33,49 @@ class Push(Command):
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.value)
 
+    def __str__(self):
+        return 'push %s %s' % (self.segment, self.value)
+
 
 class PushConstant(Push):
-    pass
+    segment = 'constant'
+
+    def asm_code(self):
+        code = \
+'''@%d
+D=A
+@SP
+AM=A+1
+M=D''' % self.value
+        return code
 
 
 class PushStatic(Push):
-    pass
+    segment = 'static'
 
 
 class PushLocal(Push):
-    pass
+    segment = 'local'
 
 
 class PushArgument(Push):
-    pass
+    segment = 'argument'
 
 
 class PushThis(Push):
-    pass
+    segment = 'this'
 
 
 class PushThat(Push):
-    pass
+    segment = 'that'
 
 
 class PushPointer(Push):
-    pass
+    segment = 'pointer'
 
 
 class PushTemp(Push):
-    pass
+    segment = 'temp'
 
 
 PUSH_BY_SEGMENT = {
@@ -198,6 +215,24 @@ def parse_number(s):
     if not s.isdigit():
         raise SyntaxError('Not a number: %s' % s)
     return int(s)
+
+
+def code(commands):
+    '''
+    >>> print code([PushConstant(5)])
+    // push constant 5
+    @5
+    D=A
+    @SP
+    AM=A+1
+    M=D
+    <BLANKLINE>
+    '''
+    output = StringIO()
+    for command in commands:
+        output.write(command.asm())
+
+    return output.getvalue()
 
 
 if __name__ == '__main__':
