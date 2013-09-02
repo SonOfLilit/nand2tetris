@@ -328,6 +328,10 @@ class BranchingCommand(Command):
     def __init__(self, name):
         self.name = name
 
+    @staticmethod
+    def name_to_label(name):
+        return 'L' + name
+
     def __str__(self):
         return "%s %s" % (self.command, self.name)
 
@@ -342,16 +346,17 @@ class Label(BranchingCommand):
     command = 'label'
 
     def asm_code(self, i):
-        return '(L%s)' % self.name
+        return '(%s)' % self.name_to_label(self.name)
 
 
 class Goto(BranchingCommand):
     command = 'goto'
 
+    GOTO = '''\
+@%s
+0;JMP'''
     def asm_code(self, i):
-        return '''\
-@L%s
-0;JMP''' % self.name
+        return self.GOTO % self.name_to_label(self.name)
 
 
 class IfGoto(BranchingCommand):
@@ -359,8 +364,8 @@ class IfGoto(BranchingCommand):
 
     def asm_code(self, i):
         return Segment.POP_D + '''
-@L%s
-D;JNE''' % self.name
+@%s
+D;JNE''' % self.name_to_label(self.name)
 
 
 BRANCHING_COMMANDS = {
@@ -371,12 +376,10 @@ BRANCHING_COMMANDS = {
 
 
 class Function(Command):
-    SAVED_VARS = ['LCL', 'ARG', 'THIS', 'THAT']
-    SAVE_VAR = '''\
-@%s
-D=M
+
+    FUNCTION_LABEL = '''\
+(%s)
 '''
-    SAVE_VARS = NEWLINE.join([SAVE_VAR % var + Segment.PUSH_D for var in SAVED_VARS])
 
     # we need to "push constant 0" a variable number of times fast
     # a. load SP into A
@@ -396,21 +399,84 @@ A=A+1
 D=A
 @SP
 M=D'''
+
     def __init__(self, name, num_locals):
         self.name = name
         self.num_locals = num_locals
 
     def asm_code(self, i):
-        return self.SAVE_VARS + NEWLINE + \
-            self.ROOM_FOR_LOCALS_HEADER + \
-            self.ZERO_LOCAL * self.num_locals + \
+        return (
+            self.FUNCTION_LABEL % self.name_to_label(self.name) +
+            self.ROOM_FOR_LOCALS_HEADER +
+            self.ZERO_LOCAL * self.num_locals +
             self.ROOM_FOR_LOCALS_FOOTER
+        )
+
+    @staticmethod
+    def name_to_label(name):
+        return 'F' + name
 
     def __str__(self):
         return 'function %s %d' % (self.name, self.num_locals)
 
     def __repr__(self):
         return 'Function(%r, %d)' % (self.name, self.num_locals)
+
+
+class Call(Command):
+
+    SAVE_CONST = '''\
+@%s
+D=A
+''' + Segment.PUSH_D + NEWLINE
+
+    SAVED_VARS = ['LCL', 'ARG', 'THIS', 'THAT']
+    SAVE_VAR = '''\
+@%s
+D=M
+'''
+    SAVE_VARS = NEWLINE.join([SAVE_VAR % var + Segment.PUSH_D for var in SAVED_VARS])
+
+    SET_ARG = '''
+@%(stack_offset)d
+D=A
+@SP
+D=M-D
+@ARG
+M=D
+'''
+
+    SET_LCL = '''\
+@SP
+D=M
+@LCL
+M=D
+'''
+
+    CALL_LABEL = '''
+(%(symbol)s)'''
+
+    def __init__(self, name, num_arguments):
+        self.name = name
+        self.num_arguments = num_arguments
+
+    def asm_code(self, i):
+        stack_offset = self.num_arguments + len(self.SAVED_VARS) + 1
+        symbol = 'CALL%d' % i
+        return (
+            self.SAVE_CONST % symbol +
+            self.SAVE_VARS +
+            self.SET_ARG +
+            self.SET_LCL +
+            Goto.GOTO % Function.name_to_label(self.name) +
+            self.CALL_LABEL
+        ) % locals()
+
+    def __str__(self):
+        return 'call %s %d' % (self.name, self.num_arguments)
+
+    def __repr__(self):
+        return 'Call(%r, %d)' % (self.name, self.num_arguments)
 
 
 def parser(text):
@@ -485,6 +551,8 @@ def parser(text):
     Traceback (most recent call last):
     ...
     SyntaxError: Function cannot have 1025 locals
+    >>> list(parser('call mult 2'))
+    [Call('mult', 2)]
     '''
     for line in text.splitlines():
         if '//' in line:
@@ -515,6 +583,12 @@ def parser(text):
             if not 0 <= num_locals <= MAX_LOCALS:
                 raise SyntaxError('Function cannot have %d locals' % num_locals)
             yield Function(name, num_locals)
+        elif line[0] == 'call':
+            check_parameters(line, 2, 'Call')
+            _, name, num_arguments = line
+            check_symbol_name(name)
+            num_arguments = parse_number(num_arguments)
+            yield Call(name, num_arguments)
         else:
             raise SyntaxError('Not a recognized command: %s' % line[0])
 
@@ -649,6 +723,27 @@ def code(commands):
     <BLANKLINE>
     >>> print code([Function('mult', 3)])
     // function mult 3
+    (Fmult)
+    @SP
+    A=M
+    M=0
+    A=A+1
+    M=0
+    A=A+1
+    M=0
+    A=A+1
+    D=A
+    @SP
+    M=D
+    <BLANKLINE>
+    >>> print code([Call('mult', 2)])
+    // call mult 2
+    @CALL0
+    D=A
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
     @LCL
     D=M
     @SP
@@ -673,17 +768,19 @@ def code(commands):
     AM=M+1
     A=A-1
     M=D
-    @SP
-    A=M
-    M=0
-    A=A+1
-    M=0
-    A=A+1
-    M=0
-    A=A+1
+    @7
     D=A
     @SP
+    D=M-D
+    @ARG
     M=D
+    @SP
+    D=M
+    @LCL
+    M=D
+    @Fmult
+    0;JMP
+    (CALL0)
     <BLANKLINE>
     '''
     output = StringIO()
