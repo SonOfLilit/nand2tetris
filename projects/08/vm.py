@@ -32,23 +32,23 @@ class Command(object):
 
 class StackOperation(Command):
     '''
-    >>> Push(CONSTANT, 0)
+    >>> Push(CONSTANT, 0, 'f')
     Push(CONSTANT, 0)
-    >>> Push(CONSTANT, 0x7FFF).parameter == 0x7FFF
+    >>> Push(CONSTANT, 0x7FFF, 'f').parameter == 0x7FFF
     True
-    >>> Push(CONSTANT, 0x8000)
+    >>> Push(CONSTANT, 0x8000, 'f')
     Traceback (most recent call last):
     ...
     SyntaxError: Parameter out of range: 32768
     '''
     max_parameter_value = 0x7FFF
 
-    def __init__(self, segment, parameter, program='f'):
+    def __init__(self, segment, parameter, filename):
         if not 0 <= parameter <= self.max_parameter_value:
             raise SyntaxError('Parameter out of range: %d' % parameter)
         self.segment = segment
         self.parameter = parameter
-        self.program = program
+        self.filename = filename
 
     def __repr__(self):
         return '%s(%r, %r)' % (self.__class__.__name__, self.segment, self.parameter)
@@ -112,13 +112,13 @@ M=D'''
         self.symbol = symbol
 
     def push_asm(self, push):
-        program = push.program
+        filename = push.filename
         segment = self.symbol
         parameter = push.parameter
         return (self.read_to_d % locals()) + NEWLINE + self.PUSH_D
 
     def pop_asm(self, pop):
-        program = pop.program
+        filename = pop.filename
         segment = self.symbol
         parameter = pop.parameter
         return self.pop_asm_code % locals()
@@ -129,7 +129,7 @@ M=D'''
 
 class ConstantSegment(Segment):
     '''
-    >>> Pop(CONSTANT, 1).asm(0, None)
+    >>> Pop(CONSTANT, 1, 'f').asm(0, None)
     Traceback (most recent call last):
     ...
     SyntaxError: Cannot pop constant
@@ -144,19 +144,19 @@ D=A'''
 
 class StaticSegment(Segment):
     read_to_d = '''\
-@%(program)s.%(parameter)d
+@%(filename)s.%(parameter)d
 D=M'''
 
     pop_asm_code = NEWLINE.join([Segment.POP_D,
-'''@%(program)s.%(parameter)d
+'''@%(filename)s.%(parameter)d
 M=D'''])
 
 
 class FixedSegment(Segment):
     '''
-    >>> type(code([Push(POINTER, 1)])) is str
+    >>> type(code([Push(POINTER, 1, 'f')])) is str
     True
-    >>> code([Push(POINTER, 2)])
+    >>> code([Push(POINTER, 2, 'f')])
     Traceback (most recent call last):
     ...
     SyntaxError: Out of "pointer" segment's bounds: 2
@@ -551,7 +551,7 @@ M=D
         return 'initialize VM'
 
 
-def parser(text):
+def parser(text, filename='f'):
     '''
     >>> list(parser(''))
     []
@@ -638,7 +638,7 @@ def parser(text):
             check_parameters(line, 2, 'Stack')
             operation, segment, param = line
             if segment in SEGMENTS:
-                yield STACK_OPERATIONS[operation](SEGMENTS[segment], parse_number(param))
+                yield STACK_OPERATIONS[operation](SEGMENTS[segment], parse_number(param), filename)
             else:
                 raise SyntaxError('Not a recognized segment: %s' % segment)
         elif line[0] in ARITHMETIC_COMMANDS:
@@ -685,7 +685,7 @@ def parse_number(s):
 
 def code(commands):
     '''
-    >>> print code([Push(CONSTANT, 5)])
+    >>> print code([Push(CONSTANT, 5, 'f')])
     // push constant 5
     @5
     D=A
@@ -694,7 +694,7 @@ def code(commands):
     A=A-1
     M=D
     <BLANKLINE>
-    >>> print code([Push(CONSTANT, 5), Push(CONSTANT, 4)])
+    >>> print code([Push(CONSTANT, 5, 'f'), Push(CONSTANT, 4, 'f')])
     // push constant 5
     @5
     D=A
@@ -737,7 +737,7 @@ def code(commands):
     A=M-1
     M=D
     <BLANKLINE>
-    >>> print code([Push(LOCAL, 5)])
+    >>> print code([Push(LOCAL, 5, 'f')])
     // push local 5
     @LCL
     D=M
@@ -749,7 +749,7 @@ def code(commands):
     A=A-1
     M=D
     <BLANKLINE>
-    >>> print code([Pop(LOCAL, 5)])
+    >>> print code([Pop(LOCAL, 5, 'f')])
     // pop local 5
     @LCL
     D=M
@@ -764,7 +764,7 @@ def code(commands):
     A=M
     M=D
     <BLANKLINE>
-    >>> print code([Push(TEMP, 5)])
+    >>> print code([Push(TEMP, 5, 'f')])
     // push temp 5
     @10
     D=M
@@ -773,12 +773,29 @@ def code(commands):
     A=A-1
     M=D
     <BLANKLINE>
-    >>> print code([Pop(POINTER, 1)])
+    >>> print code([Pop(POINTER, 1, 'f')])
     // pop pointer 1
     @SP
     AM=M-1
     D=M
     @4
+    M=D
+    <BLANKLINE>
+    >>> print code([Push(STATIC, 2, 'filename')])
+    // push static 2
+    @filename.2
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    <BLANKLINE>
+    >>> print code([Pop(STATIC, 0, 'file')])
+    // pop static 0
+    @SP
+    AM=M-1
+    D=M
+    @file.0
     M=D
     <BLANKLINE>
     >>> print code([Label('hello')])
@@ -955,8 +972,9 @@ def main(args):
         print 'file not found'
         return 1
 
+    filename = os.path.basename(path)[:-3]
     with open(path, 'rb') as vmfile:
-        hack = code_with_init(parser(vmfile.read()))
+        hack = code_with_init(parser(vmfile.read(), filename))
     with open(path[:-3] + '.asm', 'wb') as asmfile:
         asmfile.write(hack)
     return 0
