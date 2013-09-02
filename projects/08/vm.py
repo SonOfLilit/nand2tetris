@@ -1,6 +1,5 @@
 #!/usr/bin/python2
 
-# TODO: initialization
 # TODO: compile directory
 
 from itertools import chain
@@ -329,8 +328,9 @@ class BranchingCommand(Command):
         self.name = name
 
     @staticmethod
-    def name_to_label(name):
-        return 'L' + name
+    def name_to_label(function, name):
+        # TODO: Should we disallow labels outside functions?
+        return '%s$%s' % (function, name)
 
     def __str__(self):
         return "%s %s" % (self.command, self.name)
@@ -345,8 +345,8 @@ class Label(BranchingCommand):
 
     command = 'label'
 
-    def asm_code(self, i, f):
-        return '(%s)' % self.name_to_label(self.name)
+    def asm_code(self, i, function):
+        return '(%s)' % self.name_to_label(function, self.name)
 
 
 class Goto(BranchingCommand):
@@ -355,17 +355,17 @@ class Goto(BranchingCommand):
     GOTO = '''\
 @%s
 0;JMP'''
-    def asm_code(self, i, f):
-        return self.GOTO % self.name_to_label(self.name)
+    def asm_code(self, i, function):
+        return self.GOTO % self.name_to_label(function, self.name)
 
 
 class IfGoto(BranchingCommand):
     command = 'if-goto'
 
-    def asm_code(self, i, f):
+    def asm_code(self, i, function):
         return Segment.POP_D + '''
 @%s
-D;JNE''' % self.name_to_label(self.name)
+D;JNE''' % self.name_to_label(function, self.name)
 
 
 BRANCHING_COMMANDS = {
@@ -783,11 +783,11 @@ def code(commands):
     <BLANKLINE>
     >>> print code([Label('hello')])
     // label hello
-    (Lhello)
+    (None$hello)
     <BLANKLINE>
     >>> print code([Goto('hello')])
     // goto hello
-    @Lhello
+    @None$hello
     0;JMP
     <BLANKLINE>
     >>> print code([IfGoto('hello')])
@@ -795,7 +795,7 @@ def code(commands):
     @SP
     AM=M-1
     D=M
-    @Lhello
+    @None$hello
     D;JNE
     <BLANKLINE>
     >>> print code([Function('mult', 3)])
@@ -937,7 +937,7 @@ def code_with_init(commands):
     @FInit
     0;JMP
     // label main
-    (Lmain)
+    (None$main)
     <BLANKLINE>
     '''
     return code(chain([Initialize()], commands))
