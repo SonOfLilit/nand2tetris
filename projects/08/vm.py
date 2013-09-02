@@ -330,7 +330,8 @@ class BranchingCommand(Command):
 
     @staticmethod
     def name_to_label(function, name):
-        # TODO: Should we disallow labels outside functions?
+        if function is not None:
+            function = function.name
         return '%s$%s' % (function, name)
 
     def __str__(self):
@@ -563,8 +564,7 @@ class Initialize(Command):
 D=A
 @SP
 M=D
-@FSys.init
-0;JMP'''
+''' + Call('Sys.init', 0).asm(i, function)[:-1]
 
     def __str__(self):
         return 'initialize VM'
@@ -957,6 +957,10 @@ def code(commands):
     A=M
     0;JMP
     <BLANKLINE>
+    >>> print code([f, Label('hello')])[len(code([f])):]
+    // label hello
+    (mult$hello)
+    <BLANKLINE>
     '''
     output = StringIO()
     current_function = None
@@ -978,8 +982,50 @@ def code_with_init(commands):
     D=A
     @SP
     M=D
+    // call Sys.init 0
+    @CALL0
+    D=A
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @LCL
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @ARG
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @THIS
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @THAT
+    D=M
+    @SP
+    AM=M+1
+    A=A-1
+    M=D
+    @5
+    D=A
+    @SP
+    D=M-D
+    @ARG
+    M=D
+    @SP
+    D=M
+    @LCL
+    M=D
     @FSys.init
     0;JMP
+    (CALL0)
     // label main
     (None$main)
     <BLANKLINE>
