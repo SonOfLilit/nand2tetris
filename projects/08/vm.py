@@ -3,6 +3,7 @@
 # TODO: initialization
 # TODO: compile directory
 
+from itertools import chain
 import os
 import re
 import sys
@@ -536,6 +537,20 @@ A=M
         return 'Return()'
 
 
+class Initialize(Command):
+    def asm_code(self, i, function):
+        return '''\
+@256
+D=A
+@SP
+M=D
+@FInit
+0;JMP'''
+
+    def __str__(self):
+        return 'initialize VM'
+
+
 def parser(text):
     '''
     >>> list(parser(''))
@@ -844,6 +859,7 @@ def code(commands):
     0;JMP
     (CALL0)
     <BLANKLINE>
+
     >>> f = Function('mult', 3)
 
     # store return value
@@ -908,6 +924,25 @@ def code(commands):
     return output.getvalue()
 
 
+def code_with_init(commands):
+    '''
+    Calls code(), but with initialization code.
+
+    >>> print code_with_init([Label('main')])
+    // initialize VM
+    @256
+    D=A
+    @SP
+    M=D
+    @FInit
+    0;JMP
+    // label main
+    (Lmain)
+    <BLANKLINE>
+    '''
+    return code(chain([Initialize()], commands))
+
+
 def main(args):
     if len(args) != 1:
         print_usage()
@@ -921,7 +956,7 @@ def main(args):
         return 1
 
     with open(path, 'rb') as vmfile:
-        hack = code(parser(vmfile.read()))
+        hack = code_with_init(parser(vmfile.read()))
     with open(path[:-3] + '.asm', 'wb') as asmfile:
         asmfile.write(hack)
     return 0
