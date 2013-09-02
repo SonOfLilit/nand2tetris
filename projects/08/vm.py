@@ -377,19 +377,34 @@ class Function(Command):
 D=M
 '''
     SAVE_VARS = NEWLINE.join([SAVE_VAR % var + Segment.PUSH_D for var in SAVED_VARS])
-    ROOM_FOR_LOCALS = '''
-@%(num_locals)d
+
+    # we need to "push constant 0" a variable number of times fast
+    # a. load SP into A
+    # b. zero at A, increase A  * N
+    # (now A holds what should be the new SP)
+    # c. write A into SP
+    ROOM_FOR_LOCALS_HEADER = '''\
+@SP
+A=M
+'''
+    ZERO_LOCAL = '''\
+M=0
+A=A+1
+'''
+
+    ROOM_FOR_LOCALS_FOOTER = '''\
 D=A
 @SP
-M=D+M'''
-    FUNCTION_HEADER = SAVE_VARS + ROOM_FOR_LOCALS
-
+M=D'''
     def __init__(self, name, num_locals):
         self.name = name
         self.num_locals = num_locals
 
     def asm_code(self, i):
-        return self.FUNCTION_HEADER % {'num_locals': self.num_locals}
+        return self.SAVE_VARS + NEWLINE + \
+            self.ROOM_FOR_LOCALS_HEADER + \
+            self.ZERO_LOCAL * self.num_locals + \
+            self.ROOM_FOR_LOCALS_FOOTER
 
     def __str__(self):
         return 'function %s %d' % (self.name, self.num_locals)
@@ -632,8 +647,8 @@ def code(commands):
     @Lhello
     D;JNE
     <BLANKLINE>
-    >>> print code([Function('mult', 5)])
-    // function mult 5
+    >>> print code([Function('mult', 3)])
+    // function mult 3
     @LCL
     D=M
     @SP
@@ -658,10 +673,17 @@ def code(commands):
     AM=M+1
     A=A-1
     M=D
-    @5
+    @SP
+    A=M
+    M=0
+    A=A+1
+    M=0
+    A=A+1
+    M=0
+    A=A+1
     D=A
     @SP
-    M=D+M
+    M=D
     <BLANKLINE>
     '''
     output = StringIO()
