@@ -1,8 +1,5 @@
 #!/usr/bin/python2
 
-# TODO: function
-# TODO: call
-# TODO: return
 # TODO: initialization
 # TODO: compile directory
 
@@ -21,14 +18,16 @@ class SyntaxError(Exception):
 
 
 class Command(object):
-    def asm(self, i):
+    def asm(self, i, f):
         '''
         Returns hack assembly code for this command.
 
         i is a unique number, useful to distinguish labels for
         different commands.
+
+        f is the current (latest) function command or None.
         '''
-        return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(i), NEWLINE)
+        return '// %s%s%s%s' % (str(self), NEWLINE, self.asm_code(i, f), NEWLINE)
 
 
 class StackOperation(Command):
@@ -59,12 +58,12 @@ class StackOperation(Command):
 
 
 class Push(StackOperation):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return self.segment.push_asm(self)
 
 
 class Pop(StackOperation):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return self.segment.pop_asm(self)
 
 
@@ -130,7 +129,7 @@ M=D'''
 
 class ConstantSegment(Segment):
     '''
-    >>> Pop(CONSTANT, 1).asm(0)
+    >>> Pop(CONSTANT, 1).asm(0, None)
     Traceback (most recent call last):
     ...
     SyntaxError: Cannot pop constant
@@ -233,17 +232,17 @@ A=M-1
 M=-M
 '''
 class Add(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return ADD_CODE
 
 
 class Sub(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return SUB_CODE
 
 
 class Neg(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return NEG_CODE
 
 
@@ -262,7 +261,7 @@ A=M-1
 M=D'''
 
 class Equality(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         jump = self.JUMP
         unique_identifier = i
         return EQUALITY_CHECK % locals()
@@ -297,12 +296,12 @@ M=!M
 '''
 
 class And(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return AND_CODE
 
 
 class Or(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return OR_CODE
 
 
@@ -345,7 +344,7 @@ class Label(BranchingCommand):
 
     command = 'label'
 
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return '(%s)' % self.name_to_label(self.name)
 
 
@@ -355,14 +354,14 @@ class Goto(BranchingCommand):
     GOTO = '''\
 @%s
 0;JMP'''
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return self.GOTO % self.name_to_label(self.name)
 
 
 class IfGoto(BranchingCommand):
     command = 'if-goto'
 
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return Segment.POP_D + '''
 @%s
 D;JNE''' % self.name_to_label(self.name)
@@ -404,7 +403,7 @@ M=D'''
         self.name = name
         self.num_locals = num_locals
 
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return (
             self.FUNCTION_LABEL % self.name_to_label(self.name) +
             self.ROOM_FOR_LOCALS_HEADER +
@@ -460,7 +459,7 @@ M=D
         self.name = name
         self.num_arguments = num_arguments
 
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         stack_offset = self.num_arguments + len(self.SAVED_VARS) + 1
         symbol = 'CALL%d' % i
         return (
@@ -477,6 +476,64 @@ M=D
 
     def __repr__(self):
         return 'Call(%r, %d)' % (self.name, self.num_arguments)
+
+
+class Return(Command):
+
+    STORE_RETURN_VALUE = '''\
+@SP
+AM=M-1
+D=M
+@R15
+M=D
+'''
+    REMOVE_LOCALS_FROM_STACK = '''\
+@%d
+D=A
+@SP
+M=M-D
+'''
+
+    RESTORE_VAR = '''\
+@%s
+M=D'''
+
+    RESTORE_VARS = NEWLINE.join([Segment.POP_D + NEWLINE + RESTORE_VAR % var for var in Call.SAVED_VARS[::-1]])
+
+    REPLACE_RETURN_ADDRESS_WITH_RETURN_VALUE_AND_JUMP = '''
+@SP
+A=M-1
+D=M
+@R14
+M=D
+@R15
+D=M
+@SP
+A=M-1
+M=D
+@R14
+A=M
+0;JMP'''
+
+    def asm_code(self, i, function):
+        # store return value
+        # remove locals from stack
+        # restore saved values
+        # store return address
+        # push return value
+        # jump to return address
+        return (
+            self.STORE_RETURN_VALUE +
+            self.REMOVE_LOCALS_FROM_STACK % function.num_locals +
+            self.RESTORE_VARS +
+            self.REPLACE_RETURN_ADDRESS_WITH_RETURN_VALUE_AND_JUMP
+            )
+
+    def __str__(self):
+        return 'return'
+
+    def __repr__(self):
+        return 'Return()'
 
 
 def parser(text):
@@ -553,6 +610,8 @@ def parser(text):
     SyntaxError: Function cannot have 1025 locals
     >>> list(parser('call mult 2'))
     [Call('mult', 2)]
+    >>> list(parser('return'))
+    [Return()]
     '''
     for line in text.splitlines():
         if '//' in line:
@@ -589,6 +648,9 @@ def parser(text):
             check_symbol_name(name)
             num_arguments = parse_number(num_arguments)
             yield Call(name, num_arguments)
+        elif line[0] == 'return':
+            check_parameters(line, 0, 'Return')
+            yield Return()
         else:
             raise SyntaxError('Not a recognized command: %s' % line[0])
 
@@ -782,10 +844,66 @@ def code(commands):
     0;JMP
     (CALL0)
     <BLANKLINE>
+    >>> f = Function('mult', 3)
+
+    # store return value
+    # remove locals from stack
+    # restore saved values
+    # store return address
+    # push return value
+    # jump to return address
+    >>> print code([f, Return()])[len(code([f])):]
+    // return
+    @SP
+    AM=M-1
+    D=M
+    @R15
+    M=D
+    @3
+    D=A
+    @SP
+    M=M-D
+    @SP
+    AM=M-1
+    D=M
+    @THAT
+    M=D
+    @SP
+    AM=M-1
+    D=M
+    @THIS
+    M=D
+    @SP
+    AM=M-1
+    D=M
+    @ARG
+    M=D
+    @SP
+    AM=M-1
+    D=M
+    @LCL
+    M=D
+    @SP
+    A=M-1
+    D=M
+    @R14
+    M=D
+    @R15
+    D=M
+    @SP
+    A=M-1
+    M=D
+    @R14
+    A=M
+    0;JMP
+    <BLANKLINE>
     '''
     output = StringIO()
+    current_function = None
     for i, command in enumerate(commands):
-        output.write(command.asm(i))
+        if isinstance(command, Function):
+            current_function = command
+        output.write(command.asm(i, current_function))
 
     return output.getvalue()
 
