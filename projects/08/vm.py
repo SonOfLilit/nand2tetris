@@ -306,7 +306,7 @@ class Or(ArithmeticCommand):
 
 
 class Not(ArithmeticCommand):
-    def asm_code(self, i):
+    def asm_code(self, i, f):
         return NOT_CODE
 
 
@@ -488,46 +488,64 @@ D=M
 @R15
 M=D
 '''
-    REMOVE_LOCALS_FROM_STACK = '''\
-@%d
-D=A
-@SP
-M=M-D
+    STORE_ARG = '''\
+@ARG
+D=M
+@R14
+M=D
 '''
-
+    SET_SP_TO_LCL = '''\
+@LCL
+D=M
+@SP
+M=D
+'''
     RESTORE_VAR = '''\
 @%s
 M=D'''
 
     RESTORE_VARS = NEWLINE.join([Segment.POP_D + NEWLINE + RESTORE_VAR % var for var in Call.SAVED_VARS[::-1]])
 
-    REPLACE_RETURN_ADDRESS_WITH_RETURN_VALUE_AND_JUMP = '''
-@SP
-A=M-1
-D=M
-@R14
+    STORE_RETURN_ADDRESS = Segment.POP_D + '''
+@R13
 M=D
+'''
+    # SP = ARG + 1
+    RESTORE_SP = '''\
+@R14
+D=M
+@SP
+M=D+1
+'''
+    WRITE_RETURN_VALUE = '''\
 @R15
 D=M
 @SP
 A=M-1
 M=D
-@R14
+'''
+    JUMP = '''\
+@R13
 A=M
 0;JMP'''
 
     def asm_code(self, i, function):
         # store return value
-        # remove locals from stack
+        # store ARG
         # restore saved values
         # store return address
-        # push return value
+        # set SP=ARG+1
+        # put return value in SP
         # jump to return address
         return (
             self.STORE_RETURN_VALUE +
-            self.REMOVE_LOCALS_FROM_STACK % function.num_locals +
-            self.RESTORE_VARS +
-            self.REPLACE_RETURN_ADDRESS_WITH_RETURN_VALUE_AND_JUMP
+            self.STORE_ARG +
+            self.SET_SP_TO_LCL +
+            self.RESTORE_VARS + NEWLINE +
+            self.STORE_RETURN_ADDRESS +
+            self.RESTORE_SP +
+            self.WRITE_RETURN_VALUE +
+            self.JUMP
             )
 
     def __str__(self):
@@ -892,10 +910,14 @@ def code(commands):
     D=M
     @R15
     M=D
-    @3
-    D=A
+    @ARG
+    D=M
+    @R14
+    M=D
+    @LCL
+    D=M
     @SP
-    M=M-D
+    M=D
     @SP
     AM=M-1
     D=M
@@ -917,16 +939,20 @@ def code(commands):
     @LCL
     M=D
     @SP
-    A=M-1
+    AM=M-1
     D=M
-    @R14
+    @R13
     M=D
+    @R14
+    D=M
+    @SP
+    M=D+1
     @R15
     D=M
     @SP
     A=M-1
     M=D
-    @R14
+    @R13
     A=M
     0;JMP
     <BLANKLINE>
@@ -974,7 +1000,7 @@ def main(args):
 
     filename = os.path.basename(path)[:-3]
     with open(path, 'rb') as vmfile:
-        hack = code_with_init(parser(vmfile.read(), filename))
+        hack = code(parser(vmfile.read(), filename))
     with open(path[:-3] + '.asm', 'wb') as asmfile:
         asmfile.write(hack)
     return 0
