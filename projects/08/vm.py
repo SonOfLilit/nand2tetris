@@ -2,6 +2,7 @@
 
 # TODO: compile directory
 
+from glob import glob
 from itertools import chain
 import os
 import re
@@ -562,7 +563,7 @@ class Initialize(Command):
 D=A
 @SP
 M=D
-@FInit
+@FSys.init
 0;JMP'''
 
     def __str__(self):
@@ -977,7 +978,7 @@ def code_with_init(commands):
     D=A
     @SP
     M=D
-    @FInit
+    @FSys.init
     0;JMP
     // label main
     (None$main)
@@ -991,22 +992,32 @@ def main(args):
         print_usage()
         return -1
     path, = args
-    if not path.endswith('.vm'):
+    if os.path.isdir(path):
+        paths = glob(os.path.join(path, '*.vm'))
+        if path.endswith(os.path.sep):
+            path = path[:-1]
+        outpath = os.path.join(path, os.path.basename(path) + '.asm')
+    elif not path.endswith('.vm'):
         print_usage()
         return -1
-    if not os.path.exists(path):
+    elif not os.path.exists(path):
         print 'file not found'
         return 1
+    else:
+        paths = [path]
+        outpath = path[:-3] + '.asm'
 
-    filename = os.path.basename(path)[:-3]
-    with open(path, 'rb') as vmfile:
-        hack = code(parser(vmfile.read(), filename))
-    with open(path[:-3] + '.asm', 'wb') as asmfile:
-        asmfile.write(hack)
+    commands = []
+    for path in paths:
+        filename = os.path.basename(path)[:-3]
+        with open(path, 'rb') as vmfile:
+            commands += parser(vmfile.read(), filename)
+    with open(outpath, 'wb') as asmfile:
+        asmfile.write(code_with_init(commands))
     return 0
 
 def print_usage():
-        print 'usage: vm.py path/to/file.vm'
+        print 'usage: vm.py [path/to/[file.vm]]'
 
 if __name__ == '__main__':
     import doctest
